@@ -58,7 +58,7 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcess_, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
 		response.parentProcessHandle = reinterpret_cast<uint32_t>(resultHandle);
 
-		ConsoleHostServer::sendData(fromPipe, Initialize, &response);
+		ConsoleHostServer::sendPacket(fromPipe, Initialize, &response);
 	}
 	else if(op == HandleCreateFile)
 	{
@@ -66,7 +66,7 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		HandleCreateFileResponse response;
 		response.returnFake = false;
 
-		ConsoleHostServer::sendData(fromPipe, HandleCreateFile, &response);
+		ConsoleHostServer::sendPacket(fromPipe, HandleCreateFile, &response);
 	}
 }
 

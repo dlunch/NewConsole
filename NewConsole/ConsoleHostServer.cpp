@@ -92,12 +92,12 @@ void ConsoleHostServer::readPipe(HANDLE pipe, size_t size, OperationType type)
 	ReadFile(pipe, op->buf, static_cast<DWORD>(size), nullptr, op);
 }
 
-void ConsoleHostServer::readPipeHeader(HANDLE pipe)
+void ConsoleHostServer::readPacketHeader(HANDLE pipe)
 {
 	readPipe(pipe, sizeof(PacketHeader), ReadHeader);
 }
 
-void ConsoleHostServer::sendData_(HANDLE pipe, uint32_t op, uint8_t *data, size_t size)
+void ConsoleHostServer::sendPacket_(HANDLE pipe, uint32_t op, uint8_t *data, size_t size)
 {
 	PacketHeader header;
 	header.op = op;
@@ -133,7 +133,7 @@ void ConsoleHostServer::dataReceived(ConnectionData *connectionData, IOOperation
 	}
 	if(connectionData->host)
 		connectionData->host->handlePacket(op->handle, connectionData->header.op, connectionData->header.length, op->buf);
-	readPipeHeader(op->handle);
+	readPacketHeader(op->handle);
 }
 
 void ConsoleHostServer::disconnected(ConnectionData *connectionData, IOOperation *op)
@@ -156,7 +156,7 @@ size_t __stdcall ConsoleHostServer::iocpThread(LPVOID)
 		{
 			if(op->type == Connect)
 			{
-				readPipeHeader(op->handle);
+				readPacketHeader(op->handle);
 				listenPipe();
 			}
 			else if(op->type == ReadHeader && transferred != 0)
