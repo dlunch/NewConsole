@@ -25,6 +25,7 @@ struct TargetData
 
 	bool initialized;
 	void *pipeHandle;
+	void *parentProcess;
 	uint8_t lastHandleId;
 };
 
@@ -125,12 +126,16 @@ void initialize(TargetData *targetData)
 	TEB *teb = reinterpret_cast<TEB *>(__readfsdword(0x18));
 	PEB32 *peb = reinterpret_cast<PEB32 *>(__readfsdword(0x30));
 #endif
-	InitializeData packet;
+	InitializeRequest packet;
 	packet.pid = reinterpret_cast<uint32_t>(teb->ClientId.UniqueProcess);
 
 	targetData->pipeHandle = openPipe(targetData);
 	writePipe(targetData, Initialize, &packet);
 
+	InitializeResponse response;
+	readPipe(targetData, &response);
+
+	targetData->parentProcess = reinterpret_cast<void *>(response.parentProcessHandle);
 	targetData->initialized = true;
 }
 

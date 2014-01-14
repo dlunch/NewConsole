@@ -118,7 +118,7 @@ void ConsoleHostServer::dataReceived(ConnectionData *connectionData, IOOperation
 {
 	if(connectionData->header.op == Initialize)
 	{
-		InitializeData *request = reinterpret_cast<InitializeData *>(op->buf);
+		InitializeRequest *request = reinterpret_cast<InitializeRequest *>(op->buf);
 		ConsoleHost *foundHost = nullptr;
 		for(auto &i : consoleHostServerData_->waitingHosts)
 		{

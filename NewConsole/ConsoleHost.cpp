@@ -49,7 +49,18 @@ ConsoleHost::~ConsoleHost()
 
 void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint8_t *data)
 {
-	if(op == HandleCreateFile)
+	if(op == Initialize)
+	{
+		InitializeRequest *req = reinterpret_cast<InitializeRequest *>(data);
+		InitializeResponse response;
+
+		HANDLE resultHandle;
+		DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcess_, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
+		response.parentProcessHandle = reinterpret_cast<uint32_t>(resultHandle);
+
+		ConsoleHostServer::sendData(fromPipe, Initialize, &response);
+	}
+	else if(op == HandleCreateFile)
 	{
 		HandleCreateFileRequest *request = reinterpret_cast<HandleCreateFileRequest *>(data);
 		HandleCreateFileResponse response;

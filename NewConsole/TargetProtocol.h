@@ -18,10 +18,14 @@ enum PacketOp
 };
 
 #pragma pack(push, 4)
-
-struct InitializeData
+struct InitializeRequest
 {
 	uint32_t pid;
+};
+
+struct InitializeResponse
+{
+	uint32_t parentProcessHandle;
 };
 
 struct HandleCreateFileRequest
