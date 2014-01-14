@@ -233,7 +233,7 @@ void Patcher::initPatch()
 	patchData.HookedNtReadFile = HookedNtReadFileAddr32;
 	patchData.HookedNtWriteFile = HookedNtWriteFileAddr32;
 	patchData.HookedNtDeviceIoControlFile = HookedNtDeviceIoControlFileAddr32;
-	patchData.HookedNtQueryVolumeInformationFile = NtQueryVolumeInformationFileAddr32;
+	patchData.HookedNtQueryVolumeInformationFile = HookedNtQueryVolumeInformationFileAddr32;
 	patchData.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr32;
 #endif
 
