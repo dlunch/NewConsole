@@ -134,7 +134,7 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 
 	uint8_t *targetTrampolineData = nullptr;
 	void *targetTargetData = VirtualAllocEx(processHandle, 0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	const size_t trampolineSize = 500;
+	const size_t trampolineSize = 1000;
 
 	size_t address = patchData->ntdllBase + 0x100000;
 	while(true)
@@ -167,11 +167,11 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 
 	targetData.originalNtQueryVolumeInformationFile = addHook<decltype(targetData.originalNtQueryVolumeInformationFile)>
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtQueryVolumeInformationFile),
-		patchData->ntQueryVolumeInformationFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 300);
+		patchData->ntQueryVolumeInformationFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 400);
 
 	targetData.originalNtCreateUserProcess = addHook<decltype(targetData.originalNtCreateUserProcess)>
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtCreateUserProcess),
-		patchData->ntCreateUserProcess, patchData->syscallSize, targetTargetData, targetTrampolineData, 300);
+		patchData->ntCreateUserProcess, patchData->syscallSize, targetTargetData, targetTrampolineData, 500);
 	
 	targetData.originalNtDuplicateObject = static_cast<decltype(targetData.originalNtDuplicateObject)>(patchData->ntDuplicateObject);
 
