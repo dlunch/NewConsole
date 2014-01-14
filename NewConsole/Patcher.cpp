@@ -15,6 +15,10 @@ struct TargetData64
 	uint64_t originalNtDeviceIoControlFile;
 	uint64_t originalNtWriteFile;
 	uint64_t originalNtReadFile;
+	uint64_t originalNtQueryVolumeInformationFile;
+	uint64_t originalNtCreateUserProcess;
+
+	uint64_t originalNtDuplicateObject;
 };
 
 struct TargetData32
@@ -23,23 +27,31 @@ struct TargetData32
 	uint32_t originalNtDeviceIoControlFile;
 	uint32_t originalNtWriteFile;
 	uint32_t originalNtReadFile;
+	uint32_t originalNtQueryVolumeInformationFile;
+	uint32_t originalNtCreateUserProcess;
+
+	uint32_t originalNtDuplicateObject;
 };
 
 struct PatchData
 {
 	size_t ntdllBase;
+	size_t syscallSize;
 
 	size_t ntCreateFile;
 	size_t ntWriteFile;
 	size_t ntReadFile;
 	size_t ntDeviceIoControlFile;
-
-	size_t syscallSize;
+	size_t ntQueryVolumeInformationFile;
+	size_t ntCreateUserProcess;
+	size_t ntDuplicateObject;
 
 	size_t HookedNtCreateFile;
 	size_t HookedNtReadFile;
 	size_t HookedNtWriteFile;
 	size_t HookedNtDeviceIoControlFile;
+	size_t HookedNtQueryVolumeInformationFile;
+	size_t HookedNtCreateUserProcess;
 };
 
 PatchData patchData;
@@ -101,48 +113,29 @@ void patchFunction(HANDLE processHandle, size_t dst, size_t trampoline)
 	WriteProcessMemory(processHandle, reinterpret_cast<LPVOID>(dst), buf, 5, nullptr);
 }
 
+template<typename WordType>
+WordType addHook(HANDLE processHandle, uint8_t *trampolineBase, size_t newFunction, size_t originalFunction,
+			 size_t originalFunctionSize, void *targetTargetData, uint8_t *targetTrampolineBase, size_t offset)
+{
+	WordType originalAddress = reinterpret_cast<WordType>(targetTrampolineBase + offset);
+	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(originalFunction), reinterpret_cast<LPVOID>(trampolineBase + offset), originalFunctionSize, nullptr);
+	offset += originalFunctionSize + 1;
+
+	createTrampoline<sizeof(WordType)>(trampolineBase + offset, newFunction, reinterpret_cast<size_t>(targetTargetData));
+	patchFunction(processHandle, originalFunction, reinterpret_cast<size_t>(targetTrampolineBase + offset));
+
+	return originalAddress;
+}
+
 template<typename TargetDataType>
 void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 {
 	TargetDataType targetData;
 
-	const size_t originalCodeSize = (patchData->syscallSize + 1) * 4;
-	uint8_t *originalCode = new uint8_t[originalCodeSize];
-	ZeroMemory(originalCode, originalCodeSize);
-	//backup original functions.
-	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(patchData->ntCreateFile), 
-					  reinterpret_cast<LPVOID>(originalCode), patchData->syscallSize, nullptr);
-	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(patchData->ntReadFile), 
-					  reinterpret_cast<LPVOID>(originalCode + patchData->syscallSize + 1), patchData->syscallSize, nullptr);
-	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(patchData->ntWriteFile), 
-					  reinterpret_cast<LPVOID>(originalCode + (patchData->syscallSize + 1) * 2), patchData->syscallSize, nullptr);
-	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(patchData->ntDeviceIoControlFile), 
-					  reinterpret_cast<LPVOID>(originalCode + (patchData->syscallSize + 1) * 3), patchData->syscallSize, nullptr);
-
-	uint8_t *targetOriginalCode = reinterpret_cast<uint8_t *>(VirtualAllocEx(processHandle, 0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READ));
-	WriteProcessMemory(processHandle, targetOriginalCode, originalCode, 100, nullptr);
-
-	targetData.originalNtCreateFile = reinterpret_cast<decltype(TargetDataType::originalNtCreateFile)>(targetOriginalCode);
-	targetData.originalNtReadFile = reinterpret_cast<decltype(TargetDataType::originalNtReadFile)>(targetOriginalCode + patchData->syscallSize + 1);
-	targetData.originalNtWriteFile = reinterpret_cast<decltype(TargetDataType::originalNtWriteFile)>(targetOriginalCode + (patchData->syscallSize + 1) * 2);
-	targetData.originalNtDeviceIoControlFile = reinterpret_cast<decltype(TargetDataType::originalNtDeviceIoControlFile)>(targetOriginalCode + (patchData->syscallSize + 1) * 3);
-
-	void *targetTargetData = VirtualAllocEx(processHandle, 0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	WriteProcessMemory(processHandle, targetTargetData, &targetData, sizeof(targetData), nullptr);
-
-	const size_t trampolineSize = 500;
-	uint8_t *trampolineData = new uint8_t[trampolineSize];
-	ZeroMemory(trampolineData, trampolineSize);
-	createTrampoline<sizeof(decltype(TargetDataType::originalNtCreateFile))>
-		(trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtCreateFile), reinterpret_cast<size_t>(targetTargetData));
-	createTrampoline<sizeof(decltype(TargetDataType::originalNtReadFile))>
-		(trampolineData + 100, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtReadFile), reinterpret_cast<size_t>(targetTargetData));
-	createTrampoline<sizeof(decltype(TargetDataType::originalNtWriteFile))>
-		(trampolineData + 200, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtWriteFile), reinterpret_cast<size_t>(targetTargetData));
-	createTrampoline<sizeof(decltype(TargetDataType::originalNtDeviceIoControlFile))>
-		(trampolineData + 300, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtDeviceIoControlFile), reinterpret_cast<size_t>(targetTargetData));
-
 	uint8_t *targetTrampolineData = nullptr;
+	void *targetTargetData = VirtualAllocEx(processHandle, 0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	const size_t trampolineSize = 500;
+
 	size_t address = patchData->ntdllBase + 0x100000;
 	while(true)
 	{
@@ -152,16 +145,40 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 			break;
 		address += 0x100000;
 	}
-	WriteProcessMemory(processHandle, targetTrampolineData, trampolineData, trampolineSize, nullptr);
+
+	uint8_t *trampolineData = new uint8_t[trampolineSize];
+	ZeroMemory(trampolineData, trampolineSize);
+
+	targetData.originalNtCreateFile = addHook<decltype(targetData.originalNtCreateFile)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtCreateFile),
+		patchData->ntCreateFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 0);
+
+	targetData.originalNtReadFile = addHook<decltype(targetData.originalNtReadFile)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtReadFile),
+		patchData->ntReadFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 100);
+
+	targetData.originalNtWriteFile = addHook<decltype(targetData.originalNtWriteFile)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtWriteFile),
+		patchData->ntWriteFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 200);
+
+	targetData.originalNtDeviceIoControlFile = addHook<decltype(targetData.originalNtDeviceIoControlFile)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtDeviceIoControlFile),
+		patchData->ntDeviceIoControlFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 300);
+
+	targetData.originalNtQueryVolumeInformationFile = addHook<decltype(targetData.originalNtQueryVolumeInformationFile)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtQueryVolumeInformationFile),
+		patchData->ntQueryVolumeInformationFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 300);
+
+	targetData.originalNtCreateUserProcess = addHook<decltype(targetData.originalNtCreateUserProcess)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtCreateUserProcess),
+		patchData->ntCreateUserProcess, patchData->syscallSize, targetTargetData, targetTrampolineData, 300);
 	
-	//patch
-	patchFunction(processHandle, patchData->ntCreateFile, reinterpret_cast<size_t>(targetTrampolineData));
-	patchFunction(processHandle, patchData->ntReadFile, reinterpret_cast<size_t>(targetTrampolineData + 100));
-	patchFunction(processHandle, patchData->ntWriteFile, reinterpret_cast<size_t>(targetTrampolineData + 200));
-	patchFunction(processHandle, patchData->ntDeviceIoControlFile, reinterpret_cast<size_t>(targetTrampolineData + 300));
+	targetData.originalNtDuplicateObject = static_cast<decltype(targetData.originalNtDuplicateObject)>(patchData->ntDuplicateObject);
+
+	WriteProcessMemory(processHandle, targetTargetData, &targetData, sizeof(targetData), nullptr);
+	WriteProcessMemory(processHandle, targetTrampolineData, trampolineData, trampolineSize, nullptr);
 
 	delete [] trampolineData;
-	delete [] originalCode;
 }
 
 void Patcher::patchProcess(void *processHandle)
@@ -197,6 +214,9 @@ void Patcher::initPatch()
 	patchData.ntWriteFile = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtWriteFile"));
 	patchData.ntReadFile = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtReadFile"));
 	patchData.ntDeviceIoControlFile = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtDeviceIoControlFile"));
+	patchData.ntQueryVolumeInformationFile = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtQueryVolumeInformationFile"));
+	patchData.ntCreateUserProcess = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtCreateUserProcess"));
+	patchData.ntDuplicateObject = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtDuplicateObject"));
 	
 #ifdef _WIN64
 	patchData.syscallSize = 11; //mov r10, rcx; mov eax, <syscallno>; syscall; retn
@@ -204,6 +224,8 @@ void Patcher::initPatch()
 	patchData.HookedNtReadFile = HookedNtReadFileAddr64;
 	patchData.HookedNtWriteFile = HookedNtWriteFileAddr64;
 	patchData.HookedNtDeviceIoControlFile = HookedNtDeviceIoControlFileAddr64;
+	patchData.HookedNtQueryVolumeInformationFile = HookedNtQueryVolumeInformationFileAddr64;
+	patchData.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr64;
 #else
 	patchData.syscallSize = 15; //mov eax, <syscallno>; call dword ptr fs:[0xc0]; retn 0xnn; (wow64)
 								//mov eax, <syscallno>; mov edx, 0x7ffe0300; call [edx]; retn 0xnn;
@@ -211,6 +233,8 @@ void Patcher::initPatch()
 	patchData.HookedNtReadFile = HookedNtReadFileAddr32;
 	patchData.HookedNtWriteFile = HookedNtWriteFileAddr32;
 	patchData.HookedNtDeviceIoControlFile = HookedNtDeviceIoControlFileAddr32;
+	patchData.HookedNtQueryVolumeInformationFile = NtQueryVolumeInformationFileAddr32;
+	patchData.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr32;
 #endif
 
 	//TODO: patchDataWoW64;
@@ -220,5 +244,7 @@ void Patcher::initPatch()
 	patchDataWoW64.HookedNtReadFile = HookedNtReadFileAddr32;
 	patchDataWoW64.HookedNtWriteFile = HookedNtWriteFileAddr32;
 	patchDataWoW64.HookedNtDeviceIoControlFile = HookedNtDeviceIoControlFileAddr32;
+	patchDataWoW64.HookedNtQueryVolumeInformationFile = HookedNtQueryVolumeInformationFileAddr32;
+	patchDataWoW64.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr32;
 #endif 
 }

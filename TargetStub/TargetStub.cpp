@@ -13,8 +13,13 @@ typedef uint32_t (__stdcall *NtWriteFile)(void *FileHandle, void *Event, void *A
 typedef uint32_t (__stdcall *NtReadFile)(void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 									   void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key); 
 typedef uint32_t (__stdcall *NtDeviceIoControlFile)(void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
-												  size_t IoControlCode, void *InputBuffer, size_t InputBufferLength, void *OutputBuffer, 
-												  size_t OutputBufferLength);
+												  size_t IoControlCode, void *InputBuffer, size_t InputBufferLength, void *OutputBuffer, size_t OutputBufferLength);
+typedef uint32_t (__stdcall *NtQueryVolumeInformationFile)(void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
+														   size_t Length, size_t FileSystemInformationClass);
+typedef uint32_t (__stdcall *NtCreateUserProcess)(void **ProcessHandle, void **ThreadHandle, size_t ProcessDesiredAccess, size_t ThreadDesiredAccess, 
+												  POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, size_t ProcessFlags, 
+												  size_t ThreadFlags, PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList);
+typedef uint32_t (__stdcall *NtDuplicateObject)(void *SourceProcessHandle, void *SourceHandle, void **TargetHandle, size_t DesiredAccess, size_t HandleAttributes, size_t Options);
 
 struct TargetData
 {
@@ -22,6 +27,9 @@ struct TargetData
 	NtDeviceIoControlFile originalNtDeviceIoControlFile;
 	NtWriteFile originalNtWriteFile;
 	NtReadFile originalNtReadFile;
+	NtQueryVolumeInformationFile originalNtQueryVolumeInformationFile;
+	NtCreateUserProcess originalNtCreateUserProcess;
+	NtDuplicateObject originalNtDuplicateObject;
 
 	bool initialized;
 	void *pipeHandle;
@@ -30,18 +38,25 @@ struct TargetData
 };
 
 extern "C" {
-__declspec(dllexport) uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle, int DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, 
-									  PLARGE_INTEGER AllocationSize, size_t FileAttributes, size_t ShareAccess, 
-									  size_t CreateDisposition, size_t CreateOptions, void *EaBuffer, size_t EaLength);
+__declspec(dllexport) uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle, int DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, 
+															PIO_STATUS_BLOCK IoStatusBlock, PLARGE_INTEGER AllocationSize, size_t FileAttributes, size_t ShareAccess, 
+															size_t CreateDisposition, size_t CreateOptions, void *EaBuffer, size_t EaLength);
 
-__declspec(dllexport) uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
-									void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key);
+__declspec(dllexport) uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, 
+														  PIO_STATUS_BLOCK IoStatusBlock, void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key);
 
-__declspec(dllexport) uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
-									 void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key);
+__declspec(dllexport) uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, 
+														   PIO_STATUS_BLOCK IoStatusBlock, void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key);
 
-__declspec(dllexport) uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
-											   size_t IoControlCode, void *InputBuffer, size_t InputBufferLength, void *OutputBuffer, size_t OutputBufferLength);
+__declspec(dllexport) uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, 
+																	 PIO_STATUS_BLOCK IoStatusBlock,  size_t IoControlCode, void *InputBuffer, size_t InputBufferLength,
+																	 void *OutputBuffer, size_t OutputBufferLength);
+__declspec(dllexport) uint32_t __stdcall HookedNtQueryVolumeInformationFile(TargetData *targetData, void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
+																			size_t Length, size_t FileSystemInformationClass);
+__declspec(dllexport) uint32_t __stdcall HookedNtCreateUserProcess(TargetData *targetData, void **ProcessHandle, void **ThreadHandle, size_t ProcessDesiredAccess, 
+																   size_t ThreadDesiredAccess, POBJECT_ATTRIBUTES ProcessObjectAttributes, 
+																   POBJECT_ATTRIBUTES ThreadObjectAttributes, size_t ProcessFlags,  size_t ThreadFlags, 
+																   PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList);
 }
 
 template<typename SrcType, typename DstType>
@@ -179,7 +194,19 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 											   size_t IoControlCode, void *InputBuffer, size_t InputBufferLength, void *OutputBuffer, size_t OutputBufferLength)
 {
 	return targetData->originalNtDeviceIoControlFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, IoControlCode, InputBuffer, InputBufferLength,
-											   OutputBuffer, OutputBufferLength);
+													 OutputBuffer, OutputBufferLength);
 }
 
-void entry() {}
+uint32_t __stdcall HookedNtQueryVolumeInformationFile(TargetData *targetData, void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
+													  size_t Length, size_t FileSystemInformationClass)
+{
+	return targetData->originalNtQueryVolumeInformationFile(FileHandle, IoStatusBlock, FileSystemInformation, Length, FileSystemInformationClass);
+}
+
+uint32_t __stdcall HookedNtCreateUserProcess(TargetData *targetData, void **ProcessHandle, void **ThreadHandle, size_t ProcessDesiredAccess, size_t ThreadDesiredAccess, 
+											 POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, size_t ProcessFlags, 
+											 size_t ThreadFlags, PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList)
+{
+	return targetData->originalNtCreateUserProcess(ProcessHandle, ThreadHandle, ProcessDesiredAccess, ThreadDesiredAccess, ProcessObjectAttributes, ThreadObjectAttributes,
+												   ProcessFlags, ThreadFlags, ProcessParameters, CreateInfo, AttributeList);
+}
