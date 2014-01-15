@@ -64,9 +64,37 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 	{
 		HandleCreateFileRequest *request = reinterpret_cast<HandleCreateFileRequest *>(data);
 		HandleCreateFileResponse response;
+
+		if(wcsstr(request->fileName, L"ConDrv") || wcsstr(request->fileName, L"\\Input") || wcsstr(request->fileName, L"\\Output"))
+			response.returnFake = true;
 		response.returnFake = false;
 
 		ConsoleHostServer::sendPacket(fromPipe, HandleCreateFile, &response);
+	}
+	else if(op == HandleReadFile)
+	{
+		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
+
+		request = request;
+	}
+	else if(op == HandleWriteFile)
+	{
+		uint8_t *buf = reinterpret_cast<uint8_t *>(data);
+
+		buf = buf;
+	}
+	else if(op == HandleDeviceIoControlFile)
+	{
+		HandleDeviceIoControlFileRequest *request = reinterpret_cast<HandleDeviceIoControlFileRequest *>(data);
+		uint8_t *inputBuf = data + sizeof(HandleDeviceIoControlFileRequest);
+
+		request = request;
+	}
+	else if(op == HandleCreateUserProcess)
+	{
+		HandleCreateUserProcessRequest *request = reinterpret_cast<HandleCreateUserProcessRequest *>(data);
+
+		request = request;
 	}
 }
 
