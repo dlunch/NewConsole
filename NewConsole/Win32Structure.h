@@ -847,3 +847,12 @@ typedef struct _TEB
 #define NtCurrentProcess() reinterpret_cast<void *>(0xffffffffL)
 #define NtCurrentThread() reinterpret_cast<void *>(0xfffffffeL)
 #endif
+
+typedef struct _FILE_FS_DEVICE_INFORMATION {
+  uint32_t DeviceType;
+  uint32_t Characteristics;
+} FILE_FS_DEVICE_INFORMATION, *PFILE_FS_DEVICE_INFORMATION;
+
+#define 	DUPLICATE_CLOSE_SOURCE   0x00000001
+#define 	DUPLICATE_SAME_ACCESS   0x00000002
+#define 	DUPLICATE_SAME_ATTRIBUTES   0x00000004

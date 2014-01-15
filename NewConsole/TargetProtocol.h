@@ -14,7 +14,8 @@ enum PacketOp
 	HandleCreateFile,
 	HandleReadFile,
 	HandleWriteFile,
-	HandleDeviceIoControl,
+	HandleDeviceIoControlFile,
+	HandleCreateUserProcess, 
 };
 
 #pragma pack(push, 4)
@@ -36,6 +37,28 @@ struct HandleCreateFileRequest
 struct HandleCreateFileResponse
 {
 	uint8_t returnFake;
+};
+
+struct HandleReadFileRequest
+{
+	uint32_t readSize;
+};
+
+struct HandleWriteFileResponse
+{
+	uint32_t writtenSize;
+};
+
+struct HandleDeviceIoControlRequest
+{
+	uint32_t code;
+	//data follows
+};
+
+//this method will be sent after proecss creation.
+struct HandleCreateUserProcessRequest
+{
+	uint32_t processHandle;
 };
 
 #pragma pack(pop)

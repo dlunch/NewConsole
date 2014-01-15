@@ -19,7 +19,8 @@ typedef uint32_t (__stdcall *NtQueryVolumeInformationFile)(void *FileHandle, PIO
 typedef uint32_t (__stdcall *NtCreateUserProcess)(void **ProcessHandle, void **ThreadHandle, size_t ProcessDesiredAccess, size_t ThreadDesiredAccess, 
 												  POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, size_t ProcessFlags, 
 												  size_t ThreadFlags, PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList);
-typedef uint32_t (__stdcall *NtDuplicateObject)(void *SourceProcessHandle, void *SourceHandle, void **TargetHandle, size_t DesiredAccess, size_t HandleAttributes, size_t Options);
+typedef uint32_t (__stdcall *NtDuplicateObject)(void *SourceProcessHandle, void *SourceHandle, void *TargetProcessHandle, void **TargetHandle, 
+												size_t DesiredAccess, size_t HandleAttributes, size_t Options);
 
 struct TargetData
 {
@@ -108,25 +109,57 @@ void *openPipe(TargetData *targetData)
 	return handle;
 }
 
-template<typename T>
-void writePipe(TargetData *targetData, uint16_t op, T *data)
+void sendPacketData(TargetData *targetData, void *data, size_t size)
+{
+	IO_STATUS_BLOCK statusBlock;
+	targetData->originalNtWriteFile(targetData->pipeHandle, 0, 0, 0, &statusBlock, data, size, 0, 0);
+}
+
+void sendPacketHeader(TargetData *targetData, uint16_t op, uint32_t length)
 {
 	PacketHeader header;
 	header.op = op;
-	header.length = sizeof(T);
+	header.length = length;
 
-	IO_STATUS_BLOCK statusBlock;
-	targetData->originalNtWriteFile(targetData->pipeHandle, 0, 0, 0, &statusBlock, &header, sizeof(header), 0, 0);
-	targetData->originalNtWriteFile(targetData->pipeHandle, 0, 0, 0, &statusBlock, data, sizeof(T), 0, 0);
+	sendPacketData(targetData, &header, sizeof(header));
+}
+
+void sendPacket(TargetData *targetData, uint16_t op, uint8_t *data, uint32_t size)
+{
+	sendPacketHeader(targetData, op, size);
+
+	if(size)
+		sendPacketData(targetData, data, size);
 }
 
 template<typename T>
-uint32_t readPipe(TargetData *targetData, T *data)
+void sendPacket(TargetData *targetData, uint16_t op, T *data)
+{
+	sendPacket(targetData, op, reinterpret_cast<uint8_t *>(data), sizeof(T));
+}
+
+void recvPacketData(TargetData *targetData, void *data, size_t size)
+{
+	IO_STATUS_BLOCK statusBlock;
+	targetData->originalNtReadFile(targetData->pipeHandle, 0, 0, 0, &statusBlock, data, size, 0, 0);
+}
+
+void recvPacketHeader(TargetData *targetData, PacketHeader *header)
+{
+	recvPacketData(targetData, header, sizeof(PacketHeader));
+}
+
+template<typename T>
+uint32_t recvPacket(TargetData *targetData, T *data, size_t *length = nullptr)
 {
 	PacketHeader header;
-	IO_STATUS_BLOCK statusBlock;
-	targetData->originalNtReadFile(targetData->pipeHandle, 0, 0, 0, &statusBlock, &header, sizeof(PacketHeader), 0, 0);
-	targetData->originalNtReadFile(targetData->pipeHandle, 0, 0, 0, &statusBlock, data, header.length, 0, 0);
+	recvPacketHeader(targetData, &header);
+
+	if(header.length)
+		recvPacketData(targetData, data, header.length);
+
+	if(length)
+		*length = header.length;
 
 	return header.op;
 }
@@ -145,10 +178,10 @@ void initialize(TargetData *targetData)
 	packet.pid = reinterpret_cast<uint32_t>(teb->ClientId.UniqueProcess);
 
 	targetData->pipeHandle = openPipe(targetData);
-	writePipe(targetData, Initialize, &packet);
+	sendPacket(targetData, Initialize, &packet);
 
 	InitializeResponse response;
-	readPipe(targetData, &response);
+	recvPacket(targetData, &response);
 
 	targetData->parentProcess = reinterpret_cast<void *>(response.parentProcessHandle);
 	targetData->initialized = true;
@@ -164,9 +197,9 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 	HandleCreateFileResponse response;
 	copyMemory(request.fileName, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length);
 	request.fileName[ObjectAttributes->ObjectName->Length / 2] = 0;
-	writePipe(targetData, HandleCreateFile, &request);
+	sendPacket(targetData, HandleCreateFile, &request);
 
-	readPipe(targetData, &response);
+	recvPacket(targetData, &response);
 
 	if(response.returnFake)
 	{
@@ -181,18 +214,53 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 									void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key)
 {
+	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
+	{
+		HandleReadFileRequest request;
+		request.readSize = static_cast<uint32_t>(Length);
+		sendPacket(targetData, HandleReadFile, &request);
+
+		size_t length;
+		recvPacket(targetData, reinterpret_cast<uint8_t *>(Buffer), &length);
+		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(length);
+		return 0;
+	}
 	return targetData->originalNtReadFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
 }
 
 uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 									 void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key)
 {
+	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
+	{
+		sendPacket(targetData, HandleWriteFile, reinterpret_cast<uint8_t *>(Buffer), static_cast<uint32_t>(Length));
+
+		HandleWriteFileResponse response;
+		recvPacket(targetData, &response);
+		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(response.writtenSize);
+		return 0;
+	}
 	return targetData->originalNtWriteFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
 }
 
 uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 											   size_t IoControlCode, void *InputBuffer, size_t InputBufferLength, void *OutputBuffer, size_t OutputBufferLength)
 {
+	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
+	{
+		HandleDeviceIoControlRequest request;
+		request.code = static_cast<uint32_t>(IoControlCode);
+		
+		sendPacketHeader(targetData, HandleDeviceIoControlFile, sizeof(request) + static_cast<uint32_t>(InputBufferLength));
+		sendPacketData(targetData, &request, sizeof(request));
+		if(InputBufferLength)
+			sendPacketData(targetData, InputBuffer, InputBufferLength);
+
+		size_t length;
+		recvPacket(targetData, reinterpret_cast<uint8_t *>(OutputBuffer), &length);
+		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(length);
+		return 0;
+	}
 	return targetData->originalNtDeviceIoControlFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, IoControlCode, InputBuffer, InputBufferLength,
 													 OutputBuffer, OutputBufferLength);
 }
@@ -200,6 +268,21 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 uint32_t __stdcall HookedNtQueryVolumeInformationFile(TargetData *targetData, void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
 													  size_t Length, size_t FileSystemInformationClass)
 {
+	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
+	{
+		if(FileSystemInformationClass == 4) //FileFsDeviceInformation
+		{
+			if(Length < 8)
+				return 0xc0000023; //STATUS_BUFFER_TOO_SMALL
+
+			FILE_FS_DEVICE_INFORMATION *information = reinterpret_cast<FILE_FS_DEVICE_INFORMATION *>(FileSystemInformation);
+			information->Characteristics = 0x20000; //returned value from real stdin.
+			information->DeviceType = 0x50;
+
+			IoStatusBlock->Information = reinterpret_cast<uint32_t *>(Length);
+		}
+		return 0;
+	}
 	return targetData->originalNtQueryVolumeInformationFile(FileHandle, IoStatusBlock, FileSystemInformation, Length, FileSystemInformationClass);
 }
 
@@ -207,6 +290,19 @@ uint32_t __stdcall HookedNtCreateUserProcess(TargetData *targetData, void **Proc
 											 POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, size_t ProcessFlags, 
 											 size_t ThreadFlags, PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList)
 {
-	return targetData->originalNtCreateUserProcess(ProcessHandle, ThreadHandle, ProcessDesiredAccess, ThreadDesiredAccess, ProcessObjectAttributes, ThreadObjectAttributes,
-												   ProcessFlags, ThreadFlags, ProcessParameters, CreateInfo, AttributeList);
+	uint32_t result = targetData->originalNtCreateUserProcess(ProcessHandle, ThreadHandle, ProcessDesiredAccess, ThreadDesiredAccess, ProcessObjectAttributes, 
+															  ThreadObjectAttributes, ProcessFlags, ThreadFlags, ProcessParameters, CreateInfo, AttributeList);
+	if(result)
+	{
+		void *resultHandle;
+		targetData->originalNtDuplicateObject(NtCurrentProcess(), ProcessHandle, targetData->parentProcess, &resultHandle, 0, 0, DUPLICATE_SAME_ATTRIBUTES | DUPLICATE_SAME_ACCESS);
+		
+		HandleCreateUserProcessRequest request;
+		request.processHandle = reinterpret_cast<uint32_t>(resultHandle);
+		sendPacket(targetData, HandleCreateUserProcess, &request);
+		
+		PacketHeader header;
+		recvPacketHeader(targetData, &header); //we need to wait until host to complete patch.
+	}
+	return result;
 }
