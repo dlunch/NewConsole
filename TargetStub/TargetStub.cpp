@@ -58,6 +58,8 @@ __declspec(dllexport) uint32_t __stdcall HookedNtCreateUserProcess(TargetData *t
 																   size_t ThreadDesiredAccess, POBJECT_ATTRIBUTES ProcessObjectAttributes, 
 																   POBJECT_ATTRIBUTES ThreadObjectAttributes, size_t ProcessFlags,  size_t ThreadFlags, 
 																   PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList);
+__declspec(dllexport) uint32_t __stdcall HookedNtDuplicateObject(TargetData *targetData, void *SourceProcessHandle, void *SourceHandle, void *TargetProcessHandle, 
+																 void **TargetHandle,  size_t DesiredAccess, size_t HandleAttributes, size_t Options);
 }
 
 template<typename SrcType, typename DstType>
@@ -107,6 +109,16 @@ void *openPipe(TargetData *targetData)
 	targetData->originalNtCreateFile(&handle, GENERIC_READ | GENERIC_WRITE | FILE_GENERIC_READ | FILE_GENERIC_WRITE, 
 				 &attributes, &statusBlock, 0, 0, 0, FILE_OPEN, FILE_SYNCHRONOUS_IO_ALERT, 0, 0);
 	return handle;
+}
+
+void *newFakeHandle(TargetData *targetData)
+{
+	return reinterpret_cast<void *>(0xeeff00f3 | ((targetData->lastHandleId ++) << 8));
+}
+
+bool isFakeHandle(void *handle)
+{
+	return (reinterpret_cast<size_t>(handle) & 0xeeff0000) == 0xeeff0000;
 }
 
 void sendPacketData(TargetData *targetData, void *data, size_t size)
@@ -203,7 +215,7 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 
 	if(response.returnFake)
 	{
-		*reinterpret_cast<size_t *>(FileHandle) = 0xeeff00f3 | ((targetData->lastHandleId ++) << 8);
+		*FileHandle = newFakeHandle(targetData);
 		return 0;
 	}
 	
@@ -214,7 +226,7 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 									void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key)
 {
-	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
+	if(isFakeHandle(FileHandle))
 	{
 		HandleReadFileRequest request;
 		request.readSize = static_cast<uint32_t>(Length);
@@ -231,7 +243,7 @@ uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, vo
 uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 									 void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key)
 {
-	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
+	if(isFakeHandle(FileHandle))
 	{
 		sendPacket(targetData, HandleWriteFile, reinterpret_cast<uint8_t *>(Buffer), static_cast<uint32_t>(Length));
 
@@ -246,7 +258,7 @@ uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, v
 uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 											   size_t IoControlCode, void *InputBuffer, size_t InputBufferLength, void *OutputBuffer, size_t OutputBufferLength)
 {
-	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
+	if(isFakeHandle(FileHandle))
 	{
 		HandleDeviceIoControlFileRequest request;
 		request.code = static_cast<uint32_t>(IoControlCode);
@@ -268,7 +280,7 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 uint32_t __stdcall HookedNtQueryVolumeInformationFile(TargetData *targetData, void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
 													  size_t Length, size_t FileSystemInformationClass)
 {
-	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
+	if(isFakeHandle(FileHandle))
 	{
 		if(FileSystemInformationClass == 4) //FileFsDeviceInformation
 		{
@@ -305,4 +317,15 @@ uint32_t __stdcall HookedNtCreateUserProcess(TargetData *targetData, void **Proc
 		recvPacketHeader(targetData, &header); //we need to wait until host to complete patch.
 	}
 	return result;
+}
+
+uint32_t __stdcall HookedNtDuplicateObject(TargetData *targetData, void *SourceProcessHandle, void *SourceHandle, void *TargetProcessHandle, void **TargetHandle, 
+										   size_t DesiredAccess, size_t HandleAttributes, size_t Options)
+{
+	if(isFakeHandle(SourceHandle) && TargetProcessHandle == NtCurrentProcess())
+	{
+		*TargetHandle = newFakeHandle(targetData);
+		return 0;
+	}
+	return targetData->originalNtDuplicateObject(SourceProcessHandle, SourceHandle, TargetProcessHandle, TargetHandle, DesiredAccess, HandleAttributes, Options);
 }
