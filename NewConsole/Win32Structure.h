@@ -856,3 +856,10 @@ typedef struct _FILE_FS_DEVICE_INFORMATION {
 #define 	DUPLICATE_CLOSE_SOURCE   0x00000001
 #define 	DUPLICATE_SAME_ACCESS   0x00000002
 #define 	DUPLICATE_SAME_ATTRIBUTES   0x00000004
+
+#define FILE_SUPERSEDED                         0x00000000
+#define FILE_OPENED                             0x00000001
+#define FILE_CREATED                            0x00000002
+#define FILE_OVERWRITTEN                        0x00000003
+#define FILE_EXISTS                             0x00000004
+#define FILE_DOES_NOT_EXIST                     0x00000005
