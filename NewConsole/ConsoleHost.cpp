@@ -67,7 +67,8 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 
 		if(wcsstr(request->fileName, L"ConDrv") || wcsstr(request->fileName, L"\\Input") || wcsstr(request->fileName, L"\\Output"))
 			response.returnFake = true;
-		response.returnFake = false;
+		else
+			response.returnFake = false;
 
 		ConsoleHostServer::sendPacket(fromPipe, HandleCreateFile, &response);
 	}
