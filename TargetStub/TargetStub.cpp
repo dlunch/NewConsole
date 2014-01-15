@@ -21,6 +21,7 @@ typedef uint32_t (__stdcall *NtCreateUserProcess)(void **ProcessHandle, void **T
 												  size_t ThreadFlags, PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList);
 typedef uint32_t (__stdcall *NtDuplicateObject)(void *SourceProcessHandle, void *SourceHandle, void *TargetProcessHandle, void **TargetHandle, 
 												size_t DesiredAccess, size_t HandleAttributes, size_t Options);
+typedef uint32_t (__stdcall *NtClose)(void *Handle);
 
 struct TargetData
 {
@@ -31,6 +32,7 @@ struct TargetData
 	NtQueryVolumeInformationFile originalNtQueryVolumeInformationFile;
 	NtCreateUserProcess originalNtCreateUserProcess;
 	NtDuplicateObject originalNtDuplicateObject;
+	NtClose originalNtClose;
 
 	bool initialized;
 	void *pipeHandle;
@@ -60,6 +62,7 @@ __declspec(dllexport) uint32_t __stdcall HookedNtCreateUserProcess(TargetData *t
 																   PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList);
 __declspec(dllexport) uint32_t __stdcall HookedNtDuplicateObject(TargetData *targetData, void *SourceProcessHandle, void *SourceHandle, void *TargetProcessHandle, 
 																 void **TargetHandle,  size_t DesiredAccess, size_t HandleAttributes, size_t Options);
+__declspec(dllexport) uint32_t __stdcall HookedNtClose(TargetData *targetData, void *Handle);
 }
 
 template<typename SrcType, typename DstType>
@@ -339,4 +342,11 @@ uint32_t __stdcall HookedNtDuplicateObject(TargetData *targetData, void *SourceP
 		return 0;
 	}
 	return targetData->originalNtDuplicateObject(SourceProcessHandle, SourceHandle, TargetProcessHandle, TargetHandle, DesiredAccess, HandleAttributes, Options);
+}
+
+uint32_t __stdcall HookedNtClose(TargetData *targetData, void *Handle)
+{
+	if(isFakeHandle(Handle))
+		return 0;
+	return targetData->originalNtClose(Handle);
 }
