@@ -248,7 +248,7 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 {
 	if((reinterpret_cast<size_t>(FileHandle) & 0xeeff0000) == 0xeeff0000)
 	{
-		HandleDeviceIoControlRequest request;
+		HandleDeviceIoControlFileRequest request;
 		request.code = static_cast<uint32_t>(IoControlCode);
 		
 		sendPacketHeader(targetData, HandleDeviceIoControlFile, sizeof(request) + static_cast<uint32_t>(InputBufferLength));

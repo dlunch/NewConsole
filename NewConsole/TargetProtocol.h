@@ -49,7 +49,7 @@ struct HandleWriteFileResponse
 	uint32_t writtenSize;
 };
 
-struct HandleDeviceIoControlRequest
+struct HandleDeviceIoControlFileRequest
 {
 	uint32_t code;
 	//data follows
