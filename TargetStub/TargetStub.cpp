@@ -223,7 +223,7 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 	}
 	
 	return targetData->originalNtCreateFile(FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess,
-									  CreateDisposition, CreateOptions, EaBuffer, EaLength);
+											CreateDisposition, CreateOptions, EaBuffer, EaLength);
 }
 
 uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
