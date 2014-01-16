@@ -31,7 +31,7 @@ struct InitializeResponse
 
 struct HandleCreateFileRequest
 {
-	wchar_t fileName[255];
+	uint32_t fileNameLen;
 };
 
 struct HandleCreateFileResponse

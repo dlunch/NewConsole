@@ -210,9 +210,12 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 		initialize(targetData);
 	HandleCreateFileRequest request;
 	HandleCreateFileResponse response;
-	copyMemory(request.fileName, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length);
-	request.fileName[ObjectAttributes->ObjectName->Length / 2] = 0;
-	sendPacket(targetData, HandleCreateFile, &request);
+	request.fileNameLen = ObjectAttributes->ObjectName->Length;
+	sendPacketHeader(targetData, HandleCreateFile, static_cast<uint32_t>(sizeof(HandleCreateFileRequest) + ObjectAttributes->ObjectName->Length + EaLength));
+	sendPacketData(targetData, &request, sizeof(request));
+	sendPacketData(targetData, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length);
+	if(EaLength)
+		sendPacketData(targetData, EaBuffer, EaLength);
 
 	recvPacket(targetData, &response);
 
