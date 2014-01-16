@@ -58,9 +58,6 @@ struct PatchData
 };
 
 PatchData patchData;
-#ifdef _WIN64
-PatchData patchDataWoW64;
-#endif
 
 template<int WordSize>
 void createTrampoline(uint8_t *dst, size_t functionAddr, size_t targetData)
@@ -194,24 +191,13 @@ void Patcher::patchProcess(void *processHandle)
 {
 	uint8_t *targetCodeBase = reinterpret_cast<uint8_t *>(VirtualAllocEx(processHandle, nullptr, 0x10000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READ));
 #ifdef _WIN64
-	BOOL isWow64;
-	IsWow64Process(processHandle, &isWow64);
-	if(!isWow64)
-	{
-		if(!WriteProcessMemory(processHandle, targetCodeBase, reinterpret_cast<LPCVOID>(stubData64), sizeof(stubData64), nullptr))
-			throw std::exception("WriteProcessMemory failed");
-		patch<TargetData64>(processHandle, &patchData, targetCodeBase);
-	}
-	else
-	{
-#endif
-		if(!WriteProcessMemory(processHandle, targetCodeBase, reinterpret_cast<LPCVOID>(stubData32), sizeof(stubData32), nullptr))
-			throw std::exception("WriteProcessMemory failed");
-#ifdef _WIN64
-		patch<TargetData32>(processHandle, &patchDataWoW64, targetCodeBase);
-	}
+	if(!WriteProcessMemory(processHandle, targetCodeBase, reinterpret_cast<LPCVOID>(stubData64), sizeof(stubData64), nullptr))
+		throw std::exception("WriteProcessMemory failed");
+	patch<TargetData64>(processHandle, &patchData, targetCodeBase);
 #else
-		patch<TargetData32>(processHandle, &patchData, targetCodeBase);
+	if(!WriteProcessMemory(processHandle, targetCodeBase, reinterpret_cast<LPCVOID>(stubData32), sizeof(stubData32), nullptr))
+		throw std::exception("WriteProcessMemory failed");
+	patch<TargetData32>(processHandle, &patchData, targetCodeBase);
 #endif
 }
 
@@ -250,17 +236,4 @@ void Patcher::initPatch()
 	patchData.HookedNtDuplicateObject = HookedNtDuplicateObjectAddr32;
 	patchData.HookedNtClose = HookedNtCloseAddr32;
 #endif
-
-	//TODO: patchDataWoW64;
-#ifdef _WIN64
-	patchDataWoW64.syscallSize = 15;
-	patchDataWoW64.HookedNtCreateFile = HookedNtCreateFileAddr32;
-	patchDataWoW64.HookedNtReadFile = HookedNtReadFileAddr32;
-	patchDataWoW64.HookedNtWriteFile = HookedNtWriteFileAddr32;
-	patchDataWoW64.HookedNtDeviceIoControlFile = HookedNtDeviceIoControlFileAddr32;
-	patchDataWoW64.HookedNtQueryVolumeInformationFile = HookedNtQueryVolumeInformationFileAddr32;
-	patchDataWoW64.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr32;
-	patchDataWoW64.HookedNtDuplicateObject = HookedNtDuplicateObjectAddr32;
-	patchDataWoW64.HookedNtClose = HookedNtCloseAddr32;
-#endif 
 }
