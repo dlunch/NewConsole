@@ -208,23 +208,26 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 {
 	if(!targetData->initialized)
 		initialize(targetData);
-	HandleCreateFileRequest request;
-	HandleCreateFileResponse response;
-	request.fileNameLen = ObjectAttributes->ObjectName->Length;
-	sendPacketHeader(targetData, HandleCreateFile, static_cast<uint32_t>(sizeof(HandleCreateFileRequest) + ObjectAttributes->ObjectName->Length + EaLength));
-	sendPacketData(targetData, &request, sizeof(request));
-	sendPacketData(targetData, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length);
-	if(EaLength)
-		sendPacketData(targetData, EaBuffer, EaLength);
-
-	recvPacket(targetData, &response);
-
-	if(response.returnFake)
+	if(ObjectAttributes->ObjectName->Length > 4 && ObjectAttributes->ObjectName->Buffer[1] != L'?')
 	{
-		*FileHandle = newFakeHandle(targetData);
-		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(FILE_OPENED);
-		IoStatusBlock->Status = 0;
-		return 0;
+		HandleCreateFileRequest request;
+		HandleCreateFileResponse response;
+		request.fileNameLen = ObjectAttributes->ObjectName->Length;
+		sendPacketHeader(targetData, HandleCreateFile, static_cast<uint32_t>(sizeof(HandleCreateFileRequest) + ObjectAttributes->ObjectName->Length + EaLength));
+		sendPacketData(targetData, &request, sizeof(request));
+		sendPacketData(targetData, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length);
+		if(EaLength)
+			sendPacketData(targetData, EaBuffer, EaLength);
+
+		recvPacket(targetData, &response);
+
+		if(response.returnFake)
+		{
+			*FileHandle = newFakeHandle(targetData);
+			IoStatusBlock->Information = reinterpret_cast<uint32_t *>(FILE_OPENED);
+			IoStatusBlock->Status = 0;
+			return 0;
+		}
 	}
 	
 	return targetData->originalNtCreateFile(FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess,
