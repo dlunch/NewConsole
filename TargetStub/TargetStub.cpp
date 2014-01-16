@@ -221,7 +221,6 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 		*FileHandle = newFakeHandle(targetData);
 		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(FILE_OPENED);
 		IoStatusBlock->Status = 0;
-		IoStatusBlock->Pointer = nullptr;
 		return 0;
 	}
 	
@@ -242,7 +241,6 @@ uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, vo
 		recvPacket(targetData, reinterpret_cast<uint8_t *>(Buffer), &length);
 		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(length);
 		IoStatusBlock->Status = 0;
-		IoStatusBlock->Pointer = nullptr;
 		return 0;
 	}
 	return targetData->originalNtReadFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
@@ -259,7 +257,6 @@ uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, v
 		recvPacket(targetData, &response);
 		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(response.writtenSize);
 		IoStatusBlock->Status = 0;
-		IoStatusBlock->Pointer = nullptr;
 		return 0;
 	}
 	return targetData->originalNtWriteFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
@@ -282,7 +279,6 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 		recvPacket(targetData, reinterpret_cast<uint8_t *>(OutputBuffer), &length);
 		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(length);
 		IoStatusBlock->Status = 0;
-		IoStatusBlock->Pointer = nullptr;
 		return 0;
 	}
 	return targetData->originalNtDeviceIoControlFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, IoControlCode, InputBuffer, InputBufferLength,
@@ -305,7 +301,6 @@ uint32_t __stdcall HookedNtQueryVolumeInformationFile(TargetData *targetData, vo
 
 			IoStatusBlock->Information = reinterpret_cast<uint32_t *>(Length);
 			IoStatusBlock->Status = 0;
-			IoStatusBlock->Pointer = nullptr;
 		}
 		return 0;
 	}
