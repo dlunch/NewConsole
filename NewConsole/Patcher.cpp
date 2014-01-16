@@ -48,8 +48,6 @@ struct PatchData
 	size_t ntClose;
 
 	size_t HookedNtCreateFile;
-	size_t HookedNtReadFile;
-	size_t HookedNtWriteFile;
 	size_t HookedNtDeviceIoControlFile;
 	size_t HookedNtQueryVolumeInformationFile;
 	size_t HookedNtCreateUserProcess;
@@ -134,7 +132,7 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 
 	uint8_t *targetTrampolineData = nullptr;
 	void *targetTargetData = VirtualAllocEx(processHandle, 0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	const size_t trampolineSize = 1000;
+	const size_t trampolineSize = 600;
 
 	size_t address = patchData->ntdllBase + 0x100000;
 	while(true)
@@ -153,33 +151,28 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtCreateFile),
 		patchData->ntCreateFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 0);
 
-	targetData.originalNtReadFile = addHook<decltype(targetData.originalNtReadFile)>
-		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtReadFile),
-		patchData->ntReadFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 100);
-
-	targetData.originalNtWriteFile = addHook<decltype(targetData.originalNtWriteFile)>
-		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtWriteFile),
-		patchData->ntWriteFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 200);
+	targetData.originalNtReadFile = patchData->ntReadFile;
+	targetData.originalNtWriteFile = patchData->ntWriteFile;
 
 	targetData.originalNtDeviceIoControlFile = addHook<decltype(targetData.originalNtDeviceIoControlFile)>
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtDeviceIoControlFile),
-		patchData->ntDeviceIoControlFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 300);
+		patchData->ntDeviceIoControlFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 100);
 
 	targetData.originalNtQueryVolumeInformationFile = addHook<decltype(targetData.originalNtQueryVolumeInformationFile)>
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtQueryVolumeInformationFile),
-		patchData->ntQueryVolumeInformationFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 400);
+		patchData->ntQueryVolumeInformationFile, patchData->syscallSize, targetTargetData, targetTrampolineData, 200);
 
 	targetData.originalNtCreateUserProcess = addHook<decltype(targetData.originalNtCreateUserProcess)>
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtCreateUserProcess),
-		patchData->ntCreateUserProcess, patchData->syscallSize, targetTargetData, targetTrampolineData, 500);
+		patchData->ntCreateUserProcess, patchData->syscallSize, targetTargetData, targetTrampolineData, 300);
 	
 	targetData.originalNtDuplicateObject = addHook<decltype(targetData.originalNtDuplicateObject)>
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtDuplicateObject),
-		patchData->ntDuplicateObject, patchData->syscallSize, targetTargetData, targetTrampolineData, 600);
+		patchData->ntDuplicateObject, patchData->syscallSize, targetTargetData, targetTrampolineData, 400);
 
 	targetData.originalNtClose = addHook<decltype(targetData.originalNtClose)>
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtClose),
-		patchData->ntClose, patchData->syscallSize, targetTargetData, targetTrampolineData, 700);
+		patchData->ntClose, patchData->syscallSize, targetTargetData, targetTrampolineData, 500);
 
 	WriteProcessMemory(processHandle, targetTargetData, &targetData, sizeof(targetData), nullptr);
 	WriteProcessMemory(processHandle, targetTrampolineData, trampolineData, trampolineSize, nullptr);
@@ -217,8 +210,6 @@ void Patcher::initPatch()
 #ifdef _WIN64
 	patchData.syscallSize = 11; //mov r10, rcx; mov eax, <syscallno>; syscall; retn
 	patchData.HookedNtCreateFile = HookedNtCreateFileAddr64;
-	patchData.HookedNtReadFile = HookedNtReadFileAddr64;
-	patchData.HookedNtWriteFile = HookedNtWriteFileAddr64;
 	patchData.HookedNtDeviceIoControlFile = HookedNtDeviceIoControlFileAddr64;
 	patchData.HookedNtQueryVolumeInformationFile = HookedNtQueryVolumeInformationFileAddr64;
 	patchData.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr64;
@@ -228,8 +219,6 @@ void Patcher::initPatch()
 	patchData.syscallSize = 15; //mov eax, <syscallno>; call dword ptr fs:[0xc0]; retn 0xnn; (wow64)
 								//mov eax, <syscallno>; mov edx, 0x7ffe0300; call [edx]; retn 0xnn;
 	patchData.HookedNtCreateFile = HookedNtCreateFileAddr32;
-	patchData.HookedNtReadFile = HookedNtReadFileAddr32;
-	patchData.HookedNtWriteFile = HookedNtWriteFileAddr32;
 	patchData.HookedNtDeviceIoControlFile = HookedNtDeviceIoControlFileAddr32;
 	patchData.HookedNtQueryVolumeInformationFile = HookedNtQueryVolumeInformationFileAddr32;
 	patchData.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr32;

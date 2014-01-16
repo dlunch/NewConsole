@@ -44,13 +44,6 @@ extern "C" {
 __declspec(dllexport) uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle, int DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, 
 															PIO_STATUS_BLOCK IoStatusBlock, PLARGE_INTEGER AllocationSize, size_t FileAttributes, size_t ShareAccess, 
 															size_t CreateDisposition, size_t CreateOptions, void *EaBuffer, size_t EaLength);
-
-__declspec(dllexport) uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, 
-														  PIO_STATUS_BLOCK IoStatusBlock, void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key);
-
-__declspec(dllexport) uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, 
-														   PIO_STATUS_BLOCK IoStatusBlock, void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key);
-
 __declspec(dllexport) uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, 
 																	 PIO_STATUS_BLOCK IoStatusBlock,  size_t IoControlCode, void *InputBuffer, size_t InputBufferLength,
 																	 void *OutputBuffer, size_t OutputBufferLength);
@@ -232,40 +225,6 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 	
 	return targetData->originalNtCreateFile(FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess,
 											CreateDisposition, CreateOptions, EaBuffer, EaLength);
-}
-
-uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
-									void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key)
-{
-	if(isFakeHandle(FileHandle))
-	{
-		HandleReadFileRequest request;
-		request.readSize = static_cast<uint32_t>(Length);
-		sendPacket(targetData, HandleReadFile, &request);
-
-		size_t length;
-		recvPacket(targetData, reinterpret_cast<uint8_t *>(Buffer), &length);
-		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(length);
-		IoStatusBlock->Status = 0;
-		return 0;
-	}
-	return targetData->originalNtReadFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
-}
-
-uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
-									 void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key)
-{
-	if(isFakeHandle(FileHandle))
-	{
-		sendPacket(targetData, HandleWriteFile, reinterpret_cast<uint8_t *>(Buffer), static_cast<uint32_t>(Length));
-
-		HandleWriteFileResponse response;
-		recvPacket(targetData, &response);
-		IoStatusBlock->Information = reinterpret_cast<uint32_t *>(response.writtenSize);
-		IoStatusBlock->Status = 0;
-		return 0;
-	}
-	return targetData->originalNtWriteFile(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
 }
 
 uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 

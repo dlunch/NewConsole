@@ -83,18 +83,6 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 
 		ConsoleHostServer::sendPacket(fromPipe, HandleCreateFile, &response);
 	}
-	else if(op == HandleReadFile)
-	{
-		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
-
-		__debugbreak();
-	}
-	else if(op == HandleWriteFile)
-	{
-		uint8_t *buf = reinterpret_cast<uint8_t *>(data);
-
-		__debugbreak();
-	}
 	else if(op == HandleDeviceIoControlFile)
 	{
 		HandleDeviceIoControlFileRequest *request = reinterpret_cast<HandleDeviceIoControlFileRequest *>(data);

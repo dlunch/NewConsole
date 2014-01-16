@@ -39,16 +39,6 @@ struct HandleCreateFileResponse
 	uint8_t returnFake;
 };
 
-struct HandleReadFileRequest
-{
-	uint32_t readSize;
-};
-
-struct HandleWriteFileResponse
-{
-	uint32_t writtenSize;
-};
-
 struct HandleDeviceIoControlFileRequest
 {
 	uint32_t code;
