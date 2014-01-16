@@ -35,4 +35,8 @@ public:
 	{
 		return sendPacket_(pipe, op, reinterpret_cast<uint8_t *>(data), sizeof(T));
 	}
+	static void sendPacket(void *pipe, uint32_t op)
+	{
+		return sendPacket_(pipe, op, nullptr, 0);
+	}
 };

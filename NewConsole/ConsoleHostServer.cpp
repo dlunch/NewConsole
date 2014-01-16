@@ -104,7 +104,8 @@ void ConsoleHostServer::sendPacket_(HANDLE pipe, uint32_t op, uint8_t *data, siz
 	header.length = static_cast<uint32_t>(size);
 
 	writePipe(pipe, reinterpret_cast<uint8_t *>(&header), sizeof(PacketHeader));
-	writePipe(pipe, data, size);
+	if(size)
+		writePipe(pipe, data, size);
 }
 
 void ConsoleHostServer::headerReceived(ConnectionData *connectionData, IOOperation *op)
