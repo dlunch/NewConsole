@@ -65,7 +65,7 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		HandleCreateFileRequest *request = reinterpret_cast<HandleCreateFileRequest *>(data);
 		HandleCreateFileResponse response;
 
-		if(wcsstr(request->fileName, L"ConDrv") || wcsstr(request->fileName, L"\\Input") || wcsstr(request->fileName, L"\\Output"))
+		if(wcsstr(request->fileName, L"ConDrv") || wcsstr(request->fileName, L"\\Input") || wcsstr(request->fileName, L"\\Output") || wcsstr(request->fileName, L"\\Reference"))
 			response.returnFake = true;
 		else
 			response.returnFake = false;
