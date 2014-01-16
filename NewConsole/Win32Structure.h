@@ -1,6 +1,7 @@
 #include <cstdint>
 //win32 structures
 
+#ifndef _WINNT_
 typedef union _LARGE_INTEGER
 {
 	struct
@@ -475,7 +476,7 @@ typedef struct _IMAGE_EXPORT_DIRECTORY
 	uint32_t   AddressOfNames;         // RVA from base of image
 	uint32_t   AddressOfNameOrdinals;  // RVA from base of image
 } IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
-
+#endif
 
 typedef struct _UNICODE_STRING
 {
