@@ -39,4 +39,8 @@ public:
 	{
 		return sendPacket_(pipe, op, nullptr, 0);
 	}
+	static void sendPacket(void *pipe, uint32_t op, uint8_t *data, size_t size)
+	{
+		return sendPacket_(pipe, op, data, size);
+	}
 };

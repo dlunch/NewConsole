@@ -69,10 +69,17 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		lstrcpyn(fileName, reinterpret_cast<LPCWSTR>(data + sizeof(HandleCreateFileRequest)), request->fileNameLen); //eabuffer follows.
 		fileName[request->fileNameLen / 2] = 0;
 
-		if(wcsstr(fileName, L"ConDrv") || wcsstr(fileName, L"\\Input") || wcsstr(fileName, L"\\Output") || wcsstr(fileName, L"\\Reference") || wcsstr(fileName, L"\\Connect"))
+		if(wcsstr(fileName, L"ConDrv") || wcsstr(fileName, L"\\Input") || wcsstr(fileName, L"\\Output") || wcsstr(fileName, L"\\Reference"))
 			response.returnFake = true;
 		else
 			response.returnFake = false;
+		
+		if(wcsstr(fileName, L"\\Connect"))
+		{
+			response.returnFake = true;
+			void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
+			//TODO
+		}
 
 		ConsoleHostServer::sendPacket(fromPipe, HandleCreateFile, &response);
 	}
@@ -80,20 +87,40 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 	{
 		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
 
-		request = request;
+		__debugbreak();
 	}
 	else if(op == HandleWriteFile)
 	{
 		uint8_t *buf = reinterpret_cast<uint8_t *>(data);
 
-		buf = buf;
+		__debugbreak();
 	}
 	else if(op == HandleDeviceIoControlFile)
 	{
 		HandleDeviceIoControlFileRequest *request = reinterpret_cast<HandleDeviceIoControlFileRequest *>(data);
 		uint8_t *inputBuf = data + sizeof(HandleDeviceIoControlFileRequest);
 
-		request = request;
+		if(request->code == 0x500037) //Win8.1: Called in ConsoleLaunchServerProcess
+		{
+			//inputBuf is RTL_USER_PROCESS_PARAMETERS, but we don't use that.
+			
+			//no output
+			ConsoleHostServer::sendPacket(fromPipe, HandleDeviceIoControlFile);
+		}
+		else if(request->code == 0x500023) //Win8.1: Called in ConsoleCommitState
+		{
+			//kernelbase call SetInformationProcess(ProcessConsoleHostProcess) with result of this ioctl.
+			//set outputbuffer to console host process's pid.
+			size_t pid = GetCurrentProcessId();
+			ConsoleHostServer::sendPacket(fromPipe, HandleDeviceIoControlFile, &pid);
+		}
+		else if(request->code = 0x500016) //Win8.1: Called in ConsoleCallServerGeneric
+		{
+			//no output
+			ConsoleHostServer::sendPacket(fromPipe, HandleDeviceIoControlFile);
+		}
+		else
+			__debugbreak();
 	}
 	else if(op == HandleCreateUserProcess)
 	{
