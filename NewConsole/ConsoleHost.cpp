@@ -85,13 +85,19 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 	{
 		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
 
-		__debugbreak();
+		char data[] = "dir\r\n";
+
+		ConsoleHostServer::sendPacket(fromPipe, HandleReadFile, reinterpret_cast<uint8_t *>(data), 6);
+
 	}
 	else if(op == HandleWriteFile)
 	{
 		uint8_t *buf = reinterpret_cast<uint8_t *>(data);
 
-		__debugbreak();
+		HandleWriteFileResponse response;
+		response.writtenSize = size;
+
+		ConsoleHostServer::sendPacket(fromPipe, HandleWriteFile, &response);
 	}
 	else if(op == HandleDeviceIoControlFile)
 	{
@@ -115,6 +121,64 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		else if(request->code = 0x500016) //Win8.1: Called in ConsoleCallServerGeneric
 		{
 			//no output
+#pragma pack(push, 4)
+			struct ConsoleCallServerData
+			{
+				void *requestHandle;
+				uint32_t unk1;
+				uint32_t unk2;
+				uint32_t unk3;
+				uint32_t unk4;
+				void *RequestDataPtr;
+			};
+
+			struct ConsoleCallServerRequestData
+			{
+				uint32_t requestCode;
+				uint32_t unk;
+				uint32_t data;
+			};
+			struct WriteConsoleRequestData
+			{
+				uint32_t dataSize;
+				uint32_t unk;
+				void *dataPtr;
+				uint32_t unk1;
+				uint32_t unk2;
+				uint32_t unk3;
+			};
+#pragma pack(pop)
+
+			ConsoleCallServerRequestData requestData;
+			ConsoleCallServerData *callData = reinterpret_cast<ConsoleCallServerData *>(inputBuf);
+			ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(callData->RequestDataPtr), &requestData, sizeof(ConsoleCallServerRequestData), nullptr);
+
+			if(requestData.requestCode == 0x1000008) //SetTEBLangID
+				requestData.data = 0;
+			else if(requestData.requestCode == 0x1000000) //GetConsoleCP
+				requestData.data = 65001;
+			else if(requestData.requestCode == 0x1000002) //SetConsoleMode
+				requestData.data = 0;
+			else if(requestData.requestCode == 0x1000001) //GetConsoleMode
+				requestData.data = 0;
+			else if(requestData.requestCode == 0x2000014) //GetConsoleTitle
+				__nop();
+			else if(requestData.requestCode == 0x2000007) //GetConsoleScreenBufferInfoEx
+				__nop();
+			else if(requestData.requestCode == 0x1000006) //WriteConsole
+			{
+				WriteConsoleRequestData *request = reinterpret_cast<WriteConsoleRequestData *>(inputBuf + sizeof(ConsoleCallServerData));
+				uint8_t *writeData = new uint8_t[request->dataSize];
+				ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(request->dataPtr), writeData, request->dataSize, nullptr);
+				delete [] writeData;
+
+				requestData.data = static_cast<uint32_t>(request->dataSize);
+			}
+			else
+				__nop();
+
+			WriteProcessMemory(childProcess_, reinterpret_cast<LPVOID>(reinterpret_cast<size_t>(callData->RequestDataPtr) + 8), &requestData.data, sizeof(uint32_t), nullptr);
+
 			ConsoleHostServer::sendPacket(fromPipe, HandleDeviceIoControlFile);
 		}
 		else
