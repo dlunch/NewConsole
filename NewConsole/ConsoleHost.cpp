@@ -174,6 +174,10 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 
 				requestData.data = static_cast<uint32_t>(request->dataSize);
 			}
+			else if(requestData.requestCode == 0x1000005) //ReadConsole
+			{
+				__nop();
+			}
 			else
 				__nop();
 
