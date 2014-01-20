@@ -864,3 +864,34 @@ typedef struct _FILE_FS_DEVICE_INFORMATION {
 #define FILE_OVERWRITTEN                        0x00000003
 #define FILE_EXISTS                             0x00000004
 #define FILE_DOES_NOT_EXIST                     0x00000005
+
+typedef struct _LPC_MESSAGE {
+
+	uint16_t DataLength; 
+	uint16_t Length; 
+	uint16_t MessageType; 
+	uint16_t DataInfoOffset; 
+	CLIENT_ID ClientId; 
+	uint32_t MessageId; 
+	uint32_t CallbackId;
+
+} LPC_MESSAGE, *PLPC_MESSAGE;
+
+typedef struct _LPC_SECTION_OWNER_MEMORY {
+
+	uint32_t Length; 
+	void *SectionHandle; 
+	uint32_t OffsetInSection; 
+	uint32_t ViewSize; 
+	void *ViewBase; 
+	void *OtherSideViewBase;
+
+} LPC_SECTION_OWNER_MEMORY, *PLPC_SECTION_OWNER_MEMORY;
+
+typedef struct _LPC_SECTION_MEMORY {
+
+	uint32_t Length; 
+	uint32_t ViewSize; 
+	void *ViewBase;
+
+} LPC_SECTION_MEMORY, *PLPC_SECTION_MEMORY;

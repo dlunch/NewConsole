@@ -11,6 +11,7 @@
 
 struct TargetData64
 {
+	//For >Windows 8
 	uint64_t originalNtCreateFile;
 	uint64_t originalNtDeviceIoControlFile;
 	uint64_t originalNtWriteFile;
@@ -19,10 +20,16 @@ struct TargetData64
 	uint64_t originalNtCreateUserProcess;
 	uint64_t originalNtDuplicateObject;
 	uint64_t originalNtClose;
+
+	//Older windows
+	uint64_t originalNtConnectPort;
+	uint64_t originalNtSecureConnectPort;
+	uint64_t originalNtRequestWaitReplyPort;
 };
 
 struct TargetData32
 {
+	//For >Windows 8
 	uint32_t originalNtCreateFile;
 	uint32_t originalNtDeviceIoControlFile;
 	uint32_t originalNtWriteFile;
@@ -31,6 +38,11 @@ struct TargetData32
 	uint32_t originalNtCreateUserProcess;
 	uint32_t originalNtDuplicateObject;
 	uint32_t originalNtClose;
+	
+	//Older windows
+	uint32_t originalNtConnectPort;
+	uint32_t originalNtSecureConnectPort;
+	uint32_t originalNtRequestWaitReplyPort;
 };
 
 struct PatchData
@@ -46,6 +58,9 @@ struct PatchData
 	size_t ntCreateUserProcess;
 	size_t ntDuplicateObject;
 	size_t ntClose;
+	size_t ntConnectPort;
+	size_t ntSecureConnectPort;
+	size_t ntRequestWaitReplyPort;
 
 	size_t HookedNtCreateFile;
 	size_t HookedNtReadFile;
@@ -55,6 +70,9 @@ struct PatchData
 	size_t HookedNtCreateUserProcess;
 	size_t HookedNtDuplicateObject;
 	size_t HookedNtClose;
+	size_t HookedNtConnectPort;
+	size_t HookedNtSecureConnectPort;
+	size_t HookedNtRequestWaitReplyPort;
 };
 
 PatchData patchData;
@@ -134,7 +152,7 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 
 	uint8_t *targetTrampolineData = nullptr;
 	void *targetTargetData = VirtualAllocEx(processHandle, 0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	const size_t trampolineSize = 1000;
+	const size_t trampolineSize = 1500;
 
 	size_t address = patchData->ntdllBase + 0x100000;
 	while(true)
@@ -181,6 +199,18 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtClose),
 		patchData->ntClose, patchData->syscallSize, targetTargetData, targetTrampolineData, 700);
 
+	targetData.originalNtConnectPort = addHook<decltype(targetData.originalNtConnectPort)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtConnectPort),
+		patchData->ntConnectPort, patchData->syscallSize, targetTargetData, targetTrampolineData, 800);
+
+	targetData.originalNtSecureConnectPort = addHook<decltype(targetData.originalNtSecureConnectPort)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtSecureConnectPort),
+		patchData->ntSecureConnectPort, patchData->syscallSize, targetTargetData, targetTrampolineData, 900);
+
+	targetData.originalNtRequestWaitReplyPort = addHook<decltype(targetData.originalNtRequestWaitReplyPort)>
+		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtRequestWaitReplyPort),
+		patchData->ntRequestWaitReplyPort, patchData->syscallSize, targetTargetData, targetTrampolineData, 100);
+
 	WriteProcessMemory(processHandle, targetTargetData, &targetData, sizeof(targetData), nullptr);
 	WriteProcessMemory(processHandle, targetTrampolineData, trampolineData, trampolineSize, nullptr);
 
@@ -213,6 +243,9 @@ void Patcher::initPatch()
 	patchData.ntCreateUserProcess = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtCreateUserProcess"));
 	patchData.ntDuplicateObject = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtDuplicateObject"));
 	patchData.ntClose = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtClose"));
+	patchData.ntConnectPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtConnectPort"));
+	patchData.ntSecureConnectPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "ntSecureConnectPort"));
+	patchData.ntRequestWaitReplyPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtRequestWaitReplyPort"));
 	
 #ifdef _WIN64
 	patchData.syscallSize = 11; //mov r10, rcx; mov eax, <syscallno>; syscall; retn
@@ -224,6 +257,9 @@ void Patcher::initPatch()
 	patchData.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr64;
 	patchData.HookedNtDuplicateObject = HookedNtDuplicateObjectAddr64;
 	patchData.HookedNtClose = HookedNtCloseAddr64;
+	patchData.HookedNtConnectPort = HookedNtConnectPortAddr64;
+	patchData.HookedNtSecureConnectPort = HookedNtSecureConnectPortAddr64;
+	patchData.HookedNtRequestWaitReplyPort = HookedNtRequestWaitReplyPortAddr64;
 #else
 	patchData.syscallSize = 15; //mov eax, <syscallno>; call dword ptr fs:[0xc0]; retn 0xnn; (wow64)
 								//mov eax, <syscallno>; mov edx, 0x7ffe0300; call [edx]; retn 0xnn;
@@ -235,5 +271,8 @@ void Patcher::initPatch()
 	patchData.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr32;
 	patchData.HookedNtDuplicateObject = HookedNtDuplicateObjectAddr32;
 	patchData.HookedNtClose = HookedNtCloseAddr32;
+	patchData.HookedNtConnectPort = HookedNtConnectPortAddr32;
+	patchData.HookedNtSecureConnectPort = HookedNtSecureConnectPortAddr32;
+	patchData.HookedNtRequestWaitReplyPort = HookedNtRequestWaitReplyPortAddr32;
 #endif
 }

@@ -22,6 +22,11 @@ typedef uint32_t (__stdcall *NtCreateUserProcess)(void **ProcessHandle, void **T
 typedef uint32_t (__stdcall *NtDuplicateObject)(void *SourceProcessHandle, void *SourceHandle, void *TargetProcessHandle, void **TargetHandle, 
 												size_t DesiredAccess, size_t HandleAttributes, size_t Options);
 typedef uint32_t (__stdcall *NtClose)(void *Handle);
+typedef uint32_t (__stdcall *NtConnectPort)(void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos, PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, 
+											PLPC_SECTION_MEMORY ServerSharedMemory, size_t *MaximumMessageLength, void *ConnectionInfo, size_t *ConnectionInfoLength);
+typedef uint32_t (__stdcall *NtSecureConnectPort)(void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos, PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, 
+											void *Sid, PLPC_SECTION_MEMORY ServerSharedMemory, size_t *MaximumMessageLength, void *ConnectionInfo, size_t *ConnectionInfoLength);
+typedef uint32_t (__stdcall *NtRequestWaitReplyPort)(void *PortHandle, PLPC_MESSAGE Request, PLPC_MESSAGE IncomingReply);
 
 struct TargetData
 {
@@ -33,6 +38,10 @@ struct TargetData
 	NtCreateUserProcess originalNtCreateUserProcess;
 	NtDuplicateObject originalNtDuplicateObject;
 	NtClose originalNtClose;
+	
+	NtConnectPort originalNtConnectPort;
+	NtSecureConnectPort originalNtSecureConnectPort;
+	NtRequestWaitReplyPort originalNtRequestWaitReplyPort;
 
 	bool initialized;
 	void *pipeHandle;
@@ -63,6 +72,13 @@ __declspec(dllexport) uint32_t __stdcall HookedNtCreateUserProcess(TargetData *t
 __declspec(dllexport) uint32_t __stdcall HookedNtDuplicateObject(TargetData *targetData, void *SourceProcessHandle, void *SourceHandle, void *TargetProcessHandle, 
 																 void **TargetHandle,  size_t DesiredAccess, size_t HandleAttributes, size_t Options);
 __declspec(dllexport) uint32_t __stdcall HookedNtClose(TargetData *targetData, void *Handle);
+__declspec(dllexport) uint32_t __stdcall HookedNtConnectPort(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos, 
+															 PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, PLPC_SECTION_MEMORY ServerSharedMemory, 
+															 size_t *MaximumMessageLength, void *ConnectionInfo, size_t *ConnectionInfoLength);
+__declspec(dllexport) uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos,
+																   PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, void *Sid, PLPC_SECTION_MEMORY ServerSharedMemory, 
+																   size_t *MaximumMessageLength, void *ConnectionInfo, size_t *ConnectionInfoLength);
+__declspec(dllexport) uint32_t __stdcall HookedNtRequestWaitReplyPort(TargetData *targetData, void *PortHandle, PLPC_MESSAGE Request, PLPC_MESSAGE IncomingReply);
 }
 
 template<typename SrcType, typename DstType>
@@ -350,4 +366,25 @@ uint32_t __stdcall HookedNtClose(TargetData *targetData, void *Handle)
 	if(isFakeHandle(Handle))
 		return 0;
 	return targetData->originalNtClose(Handle);
+}
+
+uint32_t __stdcall HookedNtConnectPort(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos, 
+									   PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, PLPC_SECTION_MEMORY ServerSharedMemory, size_t *MaximumMessageLength, 
+									   void *ConnectionInfo, size_t *ConnectionInfoLength)
+{
+	return targetData->originalNtConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, ServerSharedMemory, MaximumMessageLength, 
+											 ConnectionInfo, ConnectionInfoLength);
+}
+
+uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos,
+											 PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, void *Sid, PLPC_SECTION_MEMORY ServerSharedMemory, 
+											 size_t *MaximumMessageLength, void *ConnectionInfo, size_t *ConnectionInfoLength)
+{
+	return targetData->originalNtSecureConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, Sid, ServerSharedMemory, 
+												   MaximumMessageLength, ConnectionInfo, ConnectionInfoLength);
+}
+
+uint32_t __stdcall HookedNtRequestWaitReplyPort(TargetData *targetData, void *PortHandle, PLPC_MESSAGE Request, PLPC_MESSAGE IncomingReply)
+{
+	return targetData->originalNtRequestWaitReplyPort(PortHandle, Request, IncomingReply);
 }
