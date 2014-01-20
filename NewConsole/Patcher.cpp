@@ -83,7 +83,7 @@ void createTrampoline(uint8_t *dst, size_t functionAddr, size_t targetData)
 	//pop return address from stack, push our data to first of the argument list, push again return address.
 	if(WordSize == 4)
 	{
-		uint8_t patch[] = {
+		static uint8_t patch[] = {
 			0x58, //pop eax
 			0x68, 0x00, 0x00, 0x00, 0x00, //push data
 			0x50, //push eax
@@ -97,7 +97,7 @@ void createTrampoline(uint8_t *dst, size_t functionAddr, size_t targetData)
 	}
 	else if(WordSize == 8)
 	{
-		uint8_t patch[] = {																			// rcx: data, rdx: 1st arg
+		static uint8_t patch[] = {																			// rcx: data, rdx: 1st arg
 			0x58, //pop rax																			// rcx: 1st arg, rdx: 2nd arg 	     r8: 2nd arg, r9: 3rd arg
 			0x6a, 0x00, //push 0 (home space 1)														// r8: 3rd arg, r9: 4th arg		     rsp-8  | <Return Address>
 			0x4c, 0x89, 0x4c, 0x24, 0x20, //mov [rsp+32], r9										// rsp-8  | <Return Address>         rsp    | <home space 1>
