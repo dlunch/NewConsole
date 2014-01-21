@@ -223,7 +223,8 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 {
 	if(!targetData->initialized)
 		initialize(targetData);
-	if(ObjectAttributes->ObjectName->Length > 4 && ObjectAttributes->ObjectName->Buffer[1] != L'?')
+	if(ObjectAttributes && ObjectAttributes->ObjectName && FileHandle &&
+	   ObjectAttributes->ObjectName->Length > 4 && ObjectAttributes->ObjectName->Buffer[1] != L'?')
 	{
 		HandleCreateFileRequest request;
 		HandleCreateFileResponse response;
@@ -252,7 +253,7 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 									void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key)
 {
-	if(isFakeHandle(FileHandle))
+	if(IoStatusBlock && Length && Buffer && isFakeHandle(FileHandle))
 	{
 		HandleReadFileRequest request;
 		request.readSize = static_cast<uint32_t>(Length);
@@ -270,7 +271,7 @@ uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, vo
 uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 									 void *Buffer, size_t Length, PLARGE_INTEGER ByteOffset, size_t *Key)
 {
-	if(isFakeHandle(FileHandle))
+	if(IoStatusBlock && Length && Buffer && isFakeHandle(FileHandle))
 	{
 		sendPacket(targetData, HandleWriteFile, reinterpret_cast<uint8_t *>(Buffer), static_cast<uint32_t>(Length));
 
@@ -286,7 +287,7 @@ uint32_t __stdcall HookedNtWriteFile(TargetData *targetData, void *FileHandle, v
 uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 											   size_t IoControlCode, void *InputBuffer, size_t InputBufferLength, void *OutputBuffer, size_t OutputBufferLength)
 {
-	if(isFakeHandle(FileHandle))
+	if(IoStatusBlock && isFakeHandle(FileHandle))
 	{
 		HandleDeviceIoControlFileRequest request;
 		request.code = static_cast<uint32_t>(IoControlCode);
@@ -309,7 +310,7 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 uint32_t __stdcall HookedNtQueryVolumeInformationFile(TargetData *targetData, void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
 													  size_t Length, size_t FileSystemInformationClass)
 {
-	if(isFakeHandle(FileHandle))
+	if(IoStatusBlock && isFakeHandle(FileHandle))
 	{
 		if(FileSystemInformationClass == 4) //FileFsDeviceInformation
 		{
