@@ -341,7 +341,7 @@ uint32_t __stdcall HookedNtCreateUserProcess(TargetData *targetData, void **Proc
 		targetData->originalNtDuplicateObject(NtCurrentProcess(), ProcessHandle, targetData->parentProcess, &resultHandle, 0, 0, DUPLICATE_SAME_ATTRIBUTES | DUPLICATE_SAME_ACCESS);
 		
 		HandleCreateUserProcessRequest request;
-		request.processHandle = reinterpret_cast<uint32_t>(resultHandle);
+		request.processHandle = reinterpret_cast<uint64_t>(resultHandle);
 		sendPacket(targetData, HandleCreateUserProcess, &request);
 		
 		PacketHeader header;
@@ -372,6 +372,8 @@ uint32_t __stdcall HookedNtConnectPort(TargetData *targetData, void **ClientPort
 									   PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, PLPC_SECTION_MEMORY ServerSharedMemory, size_t *MaximumMessageLength, 
 									   void *ConnectionInfo, size_t *ConnectionInfoLength)
 {
+	if(!targetData->initialized)
+		initialize(targetData);
 	return targetData->originalNtConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, ServerSharedMemory, MaximumMessageLength, 
 											 ConnectionInfo, ConnectionInfoLength);
 }
@@ -380,6 +382,8 @@ uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **Clie
 											 PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, void *Sid, PLPC_SECTION_MEMORY ServerSharedMemory, 
 											 size_t *MaximumMessageLength, void *ConnectionInfo, size_t *ConnectionInfoLength)
 {
+	if(!targetData->initialized)
+		initialize(targetData);
 	return targetData->originalNtSecureConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, Sid, ServerSharedMemory, 
 												   MaximumMessageLength, ConnectionInfo, ConnectionInfoLength);
 }

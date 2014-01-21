@@ -26,7 +26,7 @@ struct InitializeRequest
 
 struct InitializeResponse
 {
-	uint32_t parentProcessHandle;
+	uint64_t parentProcessHandle;
 };
 
 struct HandleCreateFileRequest
@@ -58,7 +58,7 @@ struct HandleDeviceIoControlFileRequest
 //this method will be sent after proecss creation.
 struct HandleCreateUserProcessRequest
 {
-	uint32_t processHandle;
+	uint64_t processHandle;
 };
 
 #pragma pack(pop)

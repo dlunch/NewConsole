@@ -56,7 +56,7 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 
 		HANDLE resultHandle;
 		DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcess_, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
-		response.parentProcessHandle = reinterpret_cast<uint32_t>(resultHandle);
+		response.parentProcessHandle = reinterpret_cast<uint64_t>(resultHandle);
 
 		ConsoleHostServer::sendPacket(fromPipe, Initialize, &response);
 	}
