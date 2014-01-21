@@ -209,7 +209,7 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 
 	targetData.originalNtRequestWaitReplyPort = addHook<decltype(targetData.originalNtRequestWaitReplyPort)>
 		(processHandle, trampolineData, reinterpret_cast<size_t>(targetCodeBase + patchData->HookedNtRequestWaitReplyPort),
-		patchData->ntRequestWaitReplyPort, patchData->syscallSize, targetTargetData, targetTrampolineData, 100);
+		patchData->ntRequestWaitReplyPort, patchData->syscallSize, targetTargetData, targetTrampolineData, 1000);
 
 	WriteProcessMemory(processHandle, targetTargetData, &targetData, sizeof(targetData), nullptr);
 	WriteProcessMemory(processHandle, targetTrampolineData, trampolineData, trampolineSize, nullptr);
@@ -244,7 +244,7 @@ void Patcher::initPatch()
 	patchData.ntDuplicateObject = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtDuplicateObject"));
 	patchData.ntClose = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtClose"));
 	patchData.ntConnectPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtConnectPort"));
-	patchData.ntSecureConnectPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "ntSecureConnectPort"));
+	patchData.ntSecureConnectPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtSecureConnectPort"));
 	patchData.ntRequestWaitReplyPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtRequestWaitReplyPort"));
 	
 #ifdef _WIN64
