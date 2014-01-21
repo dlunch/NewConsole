@@ -5,6 +5,7 @@
 
 #include "ConsoleHostServer.h"
 #include "TargetProtocol.h"
+#include "Win32Structure.h"
 
 ConsoleHost::ConsoleHost(const std::wstring &process)
 {
@@ -70,9 +71,9 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		lstrcpyn(fileName, reinterpret_cast<LPCWSTR>(data + sizeof(HandleCreateFileRequest)), request->fileNameLen); //eabuffer follows.
 		fileName[request->fileNameLen / 2] = 0;
 
-		if(wcsstr(fileName, L"\\Device\\ConDrv") || wcsstr(fileName, L"\\Input") || wcsstr(fileName, L"\\Output") || wcsstr(fileName, L"\\Reference"))
+		if(!wcsncmp(fileName, L"\\Device\\ConDrv", 14) || !wcsncmp(fileName, L"\\Input", 6) || !wcsncmp(fileName, L"\\Output", 7) || !wcsncmp(fileName, L"\\Reference", 10))
 			response.returnFake = true;	
-		else if(wcsstr(fileName, L"\\Connect"))
+		else if(!wcsncmp(fileName, L"\\Connect", 8))
 		{
 			response.returnFake = true;
 			void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
@@ -193,6 +194,26 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		HandleCreateUserProcessRequest *request = reinterpret_cast<HandleCreateUserProcessRequest *>(data);
 
 		request = request;
+	}
+	else if(op == HandleLPCMessage)
+	{
+		LPC_MESSAGE *messageHeader = reinterpret_cast<LPC_MESSAGE *>(data);
+
+		HandleLPCMessageResponse response;
+		response.callOriginal = true;
+		ConsoleHostServer::sendPacket(fromPipe, HandleLPCMessage, &response);
+	}
+	else if(op == HandleLPCConnect)
+	{
+		wchar_t *name = reinterpret_cast<wchar_t *>(data);
+		
+		HandleLPCConnectResponse response;
+
+		if(!wcsncmp(name, L"\\RPC Control\\ConsoleLPC-", 24))
+			response.returnFake = true;
+
+		response.returnFake = false;
+		ConsoleHostServer::sendPacket(fromPipe, HandleLPCConnect, &response);
 	}
 }
 
