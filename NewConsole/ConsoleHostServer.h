@@ -5,8 +5,46 @@
 struct ConsoleHostServerData;
 enum OperationType;
 struct IOOperation;
-struct ConnectionData;
 class ConsoleHost;
+struct PacketHeader;
+
+class ConsoleHostConnection
+{
+	friend class ConsoleHostServer;
+private:
+	void *pipe_;
+	ConsoleHost *host_;
+	PacketHeader *header_;
+	uint8_t *buf_;
+	size_t totalReceived_;
+	
+	void sendPacket_(uint32_t op, uint8_t *data, size_t size);
+	void readPacketHeader();
+
+	void writePipe(uint8_t *data, size_t size);
+	void readPipe(uint8_t *buf, size_t size, OperationType type);
+	void headerReceived(IOOperation *op);
+	void dataReceived(IOOperation *op, size_t receivedSize);
+	void disconnected(IOOperation *op);
+	void connected();
+public:
+	ConsoleHostConnection(void *pipe);
+	~ConsoleHostConnection();
+
+	template<typename T>
+	void sendPacket(uint32_t op, T *data)
+	{
+		return sendPacket_( op, reinterpret_cast<uint8_t *>(data), sizeof(T));
+	}
+	void sendPacket(uint32_t op)
+	{
+		return sendPacket_(op, nullptr, 0);
+	}
+	void sendPacket(uint32_t op, uint8_t *data, size_t size)
+	{
+		return sendPacket_(op, data, size);
+	}
+};
 
 //static class
 class ConsoleHostServer
@@ -16,31 +54,11 @@ private:
 
 	static size_t __stdcall iocpThread(void *);
 	static void listenPipe();
-	static void writePipe(void *pipe, uint8_t *data, size_t size);
-	static void readPipe(void *pipe, size_t size, OperationType type);
-	static void readPacketHeader(void *pipe);
-	static void headerReceived(ConnectionData *connectionData, IOOperation *op);
-	static void dataReceived(ConnectionData *connectionData, IOOperation *op);
-	static void disconnected(ConnectionData *connectionData, IOOperation *op);
-	static void sendPacket_(void *pipe, uint32_t op, uint8_t *data, size_t size);
 	
 public:
 	static void initialize();
 	static void registerConsoleHost(ConsoleHost *host);
 	static void unRegisterConsoleHost(ConsoleHost *host);
 	static void patchProcess(void *processHandle);
-
-	template<typename T>
-	static void sendPacket(void *pipe, uint32_t op, T *data)
-	{
-		return sendPacket_(pipe, op, reinterpret_cast<uint8_t *>(data), sizeof(T));
-	}
-	static void sendPacket(void *pipe, uint32_t op)
-	{
-		return sendPacket_(pipe, op, nullptr, 0);
-	}
-	static void sendPacket(void *pipe, uint32_t op, uint8_t *data, size_t size)
-	{
-		return sendPacket_(pipe, op, data, size);
-	}
+	static ConsoleHost *findConsoleHostByPid(uint32_t pid);
 };

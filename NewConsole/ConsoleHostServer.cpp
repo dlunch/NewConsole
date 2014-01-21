@@ -27,16 +27,8 @@ enum OperationType
 struct IOOperation : public OVERLAPPED
 {
 	OperationType type;
-	HANDLE handle;
-	uint8_t *buf;
 };
 
-struct ConnectionData
-{
-	ConnectionData() : host(nullptr) {}
-	ConsoleHost *host;
-	PacketHeader header;
-};
 ConsoleHostServerData *ConsoleHostServer::consoleHostServerData_;
 
 void ConsoleHostServer::initialize()
@@ -59,89 +51,15 @@ void ConsoleHostServer::initialize()
 
 void ConsoleHostServer::listenPipe()
 {
-	ConnectionData *connectionData = new ConnectionData;
 	HANDLE pipe = CreateNamedPipe(L"\\\\.\\pipe\\" PIPE_NAME, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED, 0, PIPE_UNLIMITED_INSTANCES, 1024, 1024, 0, nullptr);
-	CreateIoCompletionPort(pipe, consoleHostServerData_->iocp, reinterpret_cast<ULONG_PTR>(connectionData), 0);
+	ConsoleHostConnection *connection = new ConsoleHostConnection(pipe);
+	CreateIoCompletionPort(pipe, consoleHostServerData_->iocp, reinterpret_cast<ULONG_PTR>(connection), 0);
 	
 	IOOperation *op = new IOOperation;
 	ZeroMemory(op, sizeof(IOOperation));
 	op->type = Connect;
-	op->handle = pipe;
 
 	ConnectNamedPipe(pipe, op);
-}
-
-void ConsoleHostServer::writePipe(HANDLE pipe, uint8_t *data, size_t size)
-{
-	IOOperation *op = new IOOperation;
-	ZeroMemory(op, sizeof(IOOperation));
-	op->type = Write;
-	op->handle = pipe;
-	
-	WriteFile(pipe, data, static_cast<DWORD>(size), nullptr, op);
-}
-
-void ConsoleHostServer::readPipe(HANDLE pipe, size_t size, OperationType type)
-{
-	IOOperation *op = new IOOperation;
-	ZeroMemory(op, sizeof(IOOperation));
-	op->type = type;
-	op->handle = pipe;
-	op->buf = new uint8_t[size];
-	
-	ReadFile(pipe, op->buf, static_cast<DWORD>(size), nullptr, op);
-}
-
-void ConsoleHostServer::readPacketHeader(HANDLE pipe)
-{
-	readPipe(pipe, sizeof(PacketHeader), ReadHeader);
-}
-
-void ConsoleHostServer::sendPacket_(HANDLE pipe, uint32_t op, uint8_t *data, size_t size)
-{
-	PacketHeader header;
-	header.op = op;
-	header.length = static_cast<uint32_t>(size);
-
-	writePipe(pipe, reinterpret_cast<uint8_t *>(&header), sizeof(PacketHeader));
-	if(size)
-		writePipe(pipe, data, size);
-}
-
-void ConsoleHostServer::headerReceived(ConnectionData *connectionData, IOOperation *op)
-{
-	CopyMemory(&connectionData->header, op->buf, sizeof(PacketHeader));
-
-	readPipe(op->handle, connectionData->header.length, ReadData);
-}
-
-void ConsoleHostServer::dataReceived(ConnectionData *connectionData, IOOperation *op)
-{
-	if(connectionData->header.op == Initialize)
-	{
-		InitializeRequest *request = reinterpret_cast<InitializeRequest *>(op->buf);
-		ConsoleHost *foundHost = nullptr;
-		for(auto &i : consoleHostServerData_->waitingHosts)
-		{
-			if(i->childProcessId_ == request->pid)
-			{
-				foundHost = i;
-				break;
-			}
-		}
-		connectionData->host = foundHost;
-		consoleHostServerData_->waitingHosts.remove(foundHost);
-	}
-	if(connectionData->host)
-		connectionData->host->handlePacket(op->handle, connectionData->header.op, connectionData->header.length, op->buf);
-	readPacketHeader(op->handle);
-}
-
-void ConsoleHostServer::disconnected(ConnectionData *connectionData, IOOperation *op)
-{
-	if(connectionData->host)
-		connectionData->host->handleDisconnected();
-	delete connectionData;
 }
 
 size_t __stdcall ConsoleHostServer::iocpThread(LPVOID)
@@ -149,26 +67,27 @@ size_t __stdcall ConsoleHostServer::iocpThread(LPVOID)
 	while(true)
 	{
 		DWORD transferred;
-		ConnectionData *connectionData;
+		ConsoleHostConnection *connection;
 		IOOperation *op;
-		GetQueuedCompletionStatus(consoleHostServerData_->iocp, &transferred, reinterpret_cast<ULONG_PTR *>(&connectionData), reinterpret_cast<LPOVERLAPPED *>(&op), INFINITE);
+		GetQueuedCompletionStatus(consoleHostServerData_->iocp, &transferred, reinterpret_cast<ULONG_PTR *>(&connection), reinterpret_cast<LPOVERLAPPED *>(&op), INFINITE);
 
 		if(op)
 		{
 			if(op->type == Connect)
 			{
-				readPacketHeader(op->handle);
+				connection->connected();
 				listenPipe();
 			}
 			else if(op->type == ReadHeader && transferred != 0)
-				headerReceived(connectionData, op);
+				connection->headerReceived(op);
 			else if(op->type == ReadData && transferred != 0)
-				dataReceived(connectionData, op);
+				connection->dataReceived(op, transferred);
 			else if(op->type != Write)
-				disconnected(connectionData, op);
+			{
+				connection->disconnected(op);
+				delete connection;
+			}
 
-			if(op->buf)
-				delete [] op->buf;
 			delete op;
 		}
 	}
@@ -188,4 +107,109 @@ void ConsoleHostServer::patchProcess(void *processHandle)
 {
 	AssignProcessToJobObject(consoleHostServerData_->jobObject, processHandle);
 	Patcher::patchProcess(processHandle);
+}
+
+ConsoleHost *ConsoleHostServer::findConsoleHostByPid(uint32_t pid)
+{
+	ConsoleHost *foundHost;
+	for(auto &i : consoleHostServerData_->waitingHosts)
+	{
+		if(i->childProcessId_ == pid)
+		{
+			foundHost = i;
+			break;
+		}
+	}
+	consoleHostServerData_->waitingHosts.remove(foundHost);
+	return foundHost;
+}
+
+
+ConsoleHostConnection::ConsoleHostConnection(void *pipe) : pipe_(pipe), host_(nullptr), buf_(nullptr), totalReceived_(0), header_(new PacketHeader)
+{
+
+}
+
+ConsoleHostConnection::~ConsoleHostConnection()
+{
+	if(pipe_ != INVALID_HANDLE_VALUE)
+		CloseHandle(pipe_);
+	if(buf_)
+		delete [] buf_;
+	delete header_;
+}
+
+void ConsoleHostConnection::connected()
+{
+	readPacketHeader();
+}
+
+void ConsoleHostConnection::writePipe(uint8_t *data, size_t size)
+{
+	IOOperation *op = new IOOperation;
+	ZeroMemory(op, sizeof(IOOperation));
+	op->type = Write;
+	
+	WriteFile(pipe_, data, static_cast<DWORD>(size), nullptr, op);
+}
+
+void ConsoleHostConnection::readPipe(uint8_t *buf, size_t size, OperationType type)
+{
+	IOOperation *op = new IOOperation;
+	ZeroMemory(op, sizeof(IOOperation));
+	op->type = type;
+	
+	ReadFile(pipe_, buf, static_cast<DWORD>(size), nullptr, op);
+}
+
+void ConsoleHostConnection::readPacketHeader()
+{
+	readPipe(reinterpret_cast<uint8_t *>(header_), sizeof(PacketHeader), ReadHeader);
+}
+
+void ConsoleHostConnection::sendPacket_(uint32_t op, uint8_t *data, size_t size)
+{
+	PacketHeader header;
+	header.op = op;
+	header.length = static_cast<uint32_t>(size);
+
+	writePipe(reinterpret_cast<uint8_t *>(&header), sizeof(PacketHeader));
+	if(size)
+		writePipe(data, size);
+}
+
+void ConsoleHostConnection::headerReceived(IOOperation *op)
+{
+	buf_ = new uint8_t[header_->length];
+	readPipe(buf_, header_->length, ReadData);
+}
+
+void ConsoleHostConnection::dataReceived(IOOperation *op, size_t receivedSize)
+{
+	totalReceived_ += receivedSize;
+	if(totalReceived_ < header_->length)
+	{
+		readPipe(buf_ + totalReceived_, header_->length - totalReceived_, ReadData);
+		return;
+	}
+	if(header_->op == Initialize)
+	{
+		InitializeRequest *request = reinterpret_cast<InitializeRequest *>(buf_);
+		host_ = ConsoleHostServer::findConsoleHostByPid(request->pid);
+	}
+	if(host_)
+		host_->handlePacket(this, header_->op, header_->length, buf_);
+
+	delete [] buf_;
+	buf_ = nullptr;
+	totalReceived_ = 0;
+	readPacketHeader();
+}
+
+void ConsoleHostConnection::disconnected(IOOperation *op)
+{
+	if(host_)
+		host_->handleDisconnected(this);
+	CloseHandle(pipe_);
+	pipe_ = INVALID_HANDLE_VALUE;
 }

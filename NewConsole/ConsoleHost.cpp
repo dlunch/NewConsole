@@ -48,7 +48,7 @@ ConsoleHost::~ConsoleHost()
 	cleanup();
 }
 
-void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint8_t *data)
+void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, uint32_t size, uint8_t *data)
 {
 	if(op == Initialize)
 	{
@@ -59,7 +59,7 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcess_, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
 		response.parentProcessHandle = reinterpret_cast<uint64_t>(resultHandle);
 
-		ConsoleHostServer::sendPacket(fromPipe, Initialize, &response);
+		connection->sendPacket(Initialize, &response);
 	}
 	else if(op == HandleCreateFile)
 	{
@@ -79,8 +79,10 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 			void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
 			//TODO
 		}
+		else
+			__nop();
 
-		ConsoleHostServer::sendPacket(fromPipe, HandleCreateFile, &response);
+		connection->sendPacket(HandleCreateFile, &response);
 	}
 	else if(op == HandleReadFile)
 	{
@@ -88,7 +90,7 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 
 		char data[] = "dir\r\n";
 
-		ConsoleHostServer::sendPacket(fromPipe, HandleReadFile, reinterpret_cast<uint8_t *>(data), 6);
+		connection->sendPacket(HandleReadFile, reinterpret_cast<uint8_t *>(data), 6);
 
 	}
 	else if(op == HandleWriteFile)
@@ -98,7 +100,7 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 		HandleWriteFileResponse response;
 		response.writtenSize = size;
 
-		ConsoleHostServer::sendPacket(fromPipe, HandleWriteFile, &response);
+		connection->sendPacket(HandleWriteFile, &response);
 	}
 	else if(op == HandleDeviceIoControlFile)
 	{
@@ -110,14 +112,14 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 			//inputBuf is RTL_USER_PROCESS_PARAMETERS, but we don't use that.
 			
 			//no output
-			ConsoleHostServer::sendPacket(fromPipe, HandleDeviceIoControlFile);
+			connection->sendPacket(HandleDeviceIoControlFile);
 		}
 		else if(request->code == 0x500023) //Win8.1: Called in ConsoleCommitState
 		{
 			//kernelbase call SetInformationProcess(ProcessConsoleHostProcess) with result of this ioctl.
 			//set outputbuffer to console host process's pid.
 			size_t pid = GetCurrentProcessId();
-			ConsoleHostServer::sendPacket(fromPipe, HandleDeviceIoControlFile, &pid);
+			connection->sendPacket(HandleDeviceIoControlFile, &pid);
 		}
 		else if(request->code = 0x500016) //Win8.1: Called in ConsoleCallServerGeneric
 		{
@@ -184,7 +186,7 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 
 			WriteProcessMemory(childProcess_, reinterpret_cast<LPVOID>(reinterpret_cast<size_t>(callData->RequestDataPtr) + 8), &requestData.data, sizeof(uint32_t), nullptr);
 
-			ConsoleHostServer::sendPacket(fromPipe, HandleDeviceIoControlFile);
+			connection->sendPacket(HandleDeviceIoControlFile);
 		}
 		else
 			__debugbreak();
@@ -211,11 +213,11 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 
 		HandleLPCMessageResponse response;
 		response.callOriginal = true;
-		ConsoleHostServer::sendPacket(fromPipe, HandleLPCMessage, &response);
+		connection->sendPacket(HandleLPCMessage, &response);
 	}
 }
 
-void ConsoleHost::handleDisconnected()
+void ConsoleHost::handleDisconnected(ConsoleHostConnection *connection)
 {
 
 }
