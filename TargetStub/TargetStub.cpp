@@ -125,8 +125,7 @@ void *openPipe(TargetData *targetData)
 	attributes.SecurityDescriptor = nullptr;
 	attributes.SecurityQualityOfService = nullptr;
 
-	targetData->originalNtCreateFile(&handle, GENERIC_READ | GENERIC_WRITE | FILE_GENERIC_READ | FILE_GENERIC_WRITE, 
-				 &attributes, &statusBlock, 0, 0, 0, FILE_OPEN, FILE_SYNCHRONOUS_IO_ALERT, 0, 0);
+	targetData->originalNtCreateFile(&handle, FILE_GENERIC_READ | FILE_GENERIC_WRITE, &attributes, &statusBlock, 0, 0, 0, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, 0, 0);
 	return handle;
 }
 

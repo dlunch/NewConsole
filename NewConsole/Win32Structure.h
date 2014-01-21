@@ -826,6 +826,7 @@ typedef struct _TEB
 #define FILE_MAXIMUM_DISPOSITION        0x00000005
 
 #define FILE_SYNCHRONOUS_IO_ALERT 0x00000010
+#define FILE_SYNCHRONOUS_IO_NONALERT 0x00000020
 
 #define PAGE_NOACCESS          0x01     
 #define PAGE_READONLY          0x02     
