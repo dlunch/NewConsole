@@ -367,32 +367,12 @@ uint32_t __stdcall HookedNtClose(TargetData *targetData, void *Handle)
 	return targetData->originalNtClose(Handle);
 }
 
-//return true if we do not need to call original.
-bool OnLPCConnect(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName)
-{	
-	sendPacketHeader(targetData, HandleLPCConnect, ServerPortName->Length);
-	sendPacketData(targetData, ServerPortName->Buffer, ServerPortName->Length);
-
-	HandleLPCConnectResponse response;
-	recvPacket(targetData, &response);
-	
-	if(response.returnFake)
-	{
-		*ClientPortHandle = newFakeHandle(targetData);
-		return true;
-	}
-	return false;
-}
-
 uint32_t __stdcall HookedNtConnectPort(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos, 
 									   PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, PLPC_SECTION_MEMORY ServerSharedMemory, size_t *MaximumMessageLength, 
 									   void *ConnectionInfo, size_t *ConnectionInfoLength)
 {
 	if(!targetData->initialized)
 		initialize(targetData);
-	
-	if(OnLPCConnect(targetData, ClientPortHandle, ServerPortName))
-		return 0;
 
 	return targetData->originalNtConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, ServerSharedMemory, MaximumMessageLength, 
 											 ConnectionInfo, ConnectionInfoLength);
@@ -404,9 +384,6 @@ uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **Clie
 {
 	if(!targetData->initialized)
 		initialize(targetData);
-
-	if(OnLPCConnect(targetData, ClientPortHandle, ServerPortName))
-		return 0;
 
 	return targetData->originalNtSecureConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, Sid, ServerSharedMemory, 
 												   MaximumMessageLength, ConnectionInfo, ConnectionInfoLength);

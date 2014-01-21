@@ -874,7 +874,7 @@ typedef struct _LPC_MESSAGE {
 	uint16_t DataInfoOffset; 
 	CLIENT_ID ClientId; 
 	uint32_t MessageId; 
-	uint32_t CallbackId;
+	size_t CallbackId;
 
 } LPC_MESSAGE, *PLPC_MESSAGE;
 

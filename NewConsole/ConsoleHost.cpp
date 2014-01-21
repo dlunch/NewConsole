@@ -197,23 +197,21 @@ void ConsoleHost::handlePacket(HANDLE fromPipe, uint16_t op, uint32_t size, uint
 	}
 	else if(op == HandleLPCMessage)
 	{
-		LPC_MESSAGE *messageHeader = reinterpret_cast<LPC_MESSAGE *>(data);
+		LPC_MESSAGE *lpcHeader = reinterpret_cast<LPC_MESSAGE *>(data);
+
+		struct ConsoleAPIMessageHeader
+		{
+			size_t CsrCaptureData;
+			size_t ApiNumber;
+			uint32_t Status;
+			uint32_t Reserved;
+		};
+
+		ConsoleAPIMessageHeader *messageHeader = reinterpret_cast<ConsoleAPIMessageHeader *>(data + sizeof(LPC_MESSAGE));
 
 		HandleLPCMessageResponse response;
 		response.callOriginal = true;
 		ConsoleHostServer::sendPacket(fromPipe, HandleLPCMessage, &response);
-	}
-	else if(op == HandleLPCConnect)
-	{
-		wchar_t *name = reinterpret_cast<wchar_t *>(data);
-		
-		HandleLPCConnectResponse response;
-
-		if(!wcsncmp(name, L"\\RPC Control\\ConsoleLPC-", 24))
-			response.returnFake = true;
-
-		response.returnFake = false;
-		ConsoleHostServer::sendPacket(fromPipe, HandleLPCConnect, &response);
 	}
 }
 
