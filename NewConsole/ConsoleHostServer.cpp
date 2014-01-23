@@ -196,9 +196,11 @@ void ConsoleHostConnection::dataReceived(IOOperation *op, size_t receivedSize)
 	{
 		InitializeRequest *request = reinterpret_cast<InitializeRequest *>(buf_);
 		host_ = ConsoleHostServer::findConsoleHostByPid(request->pid);
+		if(host_)
+			host_->setConnection(this);
 	}
 	if(host_)
-		host_->handlePacket(this, header_->op, header_->length, buf_);
+		host_->handlePacket(header_->op, header_->length, buf_);
 
 	delete [] buf_;
 	buf_ = nullptr;
@@ -209,7 +211,7 @@ void ConsoleHostConnection::dataReceived(IOOperation *op, size_t receivedSize)
 void ConsoleHostConnection::disconnected(IOOperation *op)
 {
 	if(host_)
-		host_->handleDisconnected(this);
+		host_->handleDisconnected();
 	CloseHandle(pipe_);
 	pipe_ = INVALID_HANDLE_VALUE;
 }

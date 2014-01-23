@@ -12,6 +12,7 @@ private:
 	int outputMode_;
 	void *childProcess_;
 	uint32_t childProcessId_;
+	ConsoleHostConnection *connection_;
 
 	void cleanup();
 	uint8_t *getInputBuffer(size_t requestSize, size_t *resultSize);
@@ -21,6 +22,7 @@ public:
 	~ConsoleHost();
 
 	void writeToConsole(const std::wstring &string);
-	void handlePacket(ConsoleHostConnection *connection, uint16_t op, uint32_t size, uint8_t *data);
-	void handleDisconnected(ConsoleHostConnection *connection);
+	void handlePacket(uint16_t op, uint32_t size, uint8_t *data);
+	void handleDisconnected();
+	void setConnection(ConsoleHostConnection *connection);
 };

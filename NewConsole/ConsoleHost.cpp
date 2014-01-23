@@ -52,7 +52,7 @@ ConsoleHost::~ConsoleHost()
 	cleanup();
 }
 
-void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, uint32_t size, uint8_t *data)
+void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 {
 	if(op == Initialize)
 	{
@@ -63,7 +63,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 		DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcess_, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
 		response.parentProcessHandle = reinterpret_cast<uint64_t>(resultHandle);
 
-		connection->sendPacket(Initialize, &response);
+		connection_->sendPacket(Initialize, &response);
 	}
 	else if(op == HandleCreateFile)
 	{
@@ -86,7 +86,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 		else
 			__nop();
 
-		connection->sendPacket(HandleCreateFile, &response);
+		connection_->sendPacket(HandleCreateFile, &response);
 	}
 	else if(op == HandleReadFile)
 	{
@@ -95,7 +95,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 		size_t size;
 		uint8_t *buffer = getInputBuffer(request->readSize, &size);
 
-		connection->sendPacket(HandleReadFile, buffer, size);
+		connection_->sendPacket(HandleReadFile, buffer, size);
 	}
 	else if(op == HandleWriteFile)
 	{
@@ -106,7 +106,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 		HandleWriteFileResponse response;
 		response.writtenSize = size;
 
-		connection->sendPacket(HandleWriteFile, &response);
+		connection_->sendPacket(HandleWriteFile, &response);
 	}
 	else if(op == HandleDeviceIoControlFile)
 	{
@@ -118,14 +118,14 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 			//inputBuf is RTL_USER_PROCESS_PARAMETERS, but we don't use that.
 			
 			//no output
-			connection->sendPacket(HandleDeviceIoControlFile);
+			connection_->sendPacket(HandleDeviceIoControlFile);
 		}
 		else if(request->code == 0x500023) //Win8.1: Called in ConsoleCommitState
 		{
 			//kernelbase call SetInformationProcess(ProcessConsoleHostProcess) with result of this ioctl.
 			//set outputbuffer to console host process's pid.
 			size_t pid = GetCurrentProcessId();
-			connection->sendPacket(HandleDeviceIoControlFile, &pid);
+			connection_->sendPacket(HandleDeviceIoControlFile, &pid);
 		}
 		else if(request->code = 0x500016) //Win8.1: Called in ConsoleCallServerGeneric
 		{
@@ -206,7 +206,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 
 			WriteProcessMemory(childProcess_, reinterpret_cast<LPVOID>(reinterpret_cast<size_t>(callData->RequestDataPtr) + 8), &requestData.data, sizeof(uint32_t), nullptr);
 
-			connection->sendPacket(HandleDeviceIoControlFile);
+			connection_->sendPacket(HandleDeviceIoControlFile);
 		}
 		else
 			__debugbreak();
@@ -233,11 +233,11 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 
 		HandleLPCMessageResponse response;
 		response.callOriginal = true;
-		connection->sendPacket(HandleLPCMessage, &response);
+		connection_->sendPacket(HandleLPCMessage, &response);
 	}
 }
 
-void ConsoleHost::handleDisconnected(ConsoleHostConnection *connection)
+void ConsoleHost::handleDisconnected()
 {
 
 }
@@ -254,4 +254,9 @@ uint8_t *ConsoleHost::getInputBuffer(size_t requestSize, size_t *resultSize)
 void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize)
 {
 
+}
+
+void ConsoleHost::setConnection(ConsoleHostConnection *connection)
+{
+	connection_ = connection;
 }
