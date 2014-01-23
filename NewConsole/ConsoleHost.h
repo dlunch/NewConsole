@@ -8,10 +8,14 @@ class ConsoleHost
 {
 	friend class ConsoleHostServer;
 private:
+	int inputMode_;
+	int outputMode_;
 	void *childProcess_;
 	uint32_t childProcessId_;
 
 	void cleanup();
+	uint8_t *getInputBuffer(size_t requestSize, size_t *resultSize);
+	void handleWrite(uint8_t *buffer, size_t bufferSize);
 public:
 	ConsoleHost(const std::wstring &process);
 	~ConsoleHost();

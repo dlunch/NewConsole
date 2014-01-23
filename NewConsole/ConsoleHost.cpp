@@ -28,6 +28,10 @@ ConsoleHost::ConsoleHost(const std::wstring &process)
 
 		ResumeThread(pi.hThread);
 		CloseHandle(pi.hThread);
+
+		//default mode
+		inputMode_ = ENABLE_ECHO_INPUT | ENABLE_EXTENDED_FLAGS | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_MOUSE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE;
+		outputMode_ = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT;
 	}
 	catch(...)
 	{
@@ -88,14 +92,16 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 	{
 		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
 
-		char data[] = "dir\r\n";
+		size_t size;
+		uint8_t *buffer = getInputBuffer(request->readSize, &size);
 
-		connection->sendPacket(HandleReadFile, reinterpret_cast<uint8_t *>(data), 6);
-
+		connection->sendPacket(HandleReadFile, buffer, size);
 	}
 	else if(op == HandleWriteFile)
 	{
 		uint8_t *buf = reinterpret_cast<uint8_t *>(data);
+
+		handleWrite(buf, size);
 
 		HandleWriteFileResponse response;
 		response.writtenSize = size;
@@ -149,6 +155,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 				uint32_t unk1;
 				uint32_t unk2;
 				uint32_t unk3;
+				uint32_t unk4;
 			};
 #pragma pack(pop)
 
@@ -159,7 +166,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 			if(requestData.requestCode == 0x1000008) //SetTEBLangID
 				requestData.data = 0;
 			else if(requestData.requestCode == 0x1000000) //GetConsoleCP
-				requestData.data = 65001;
+				requestData.data = CP_UTF8;
 			else if(requestData.requestCode == 0x1000002) //SetConsoleMode
 				requestData.data = 0;
 			else if(requestData.requestCode == 0x1000001) //GetConsoleMode
@@ -173,6 +180,19 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 				WriteConsoleRequestData *request = reinterpret_cast<WriteConsoleRequestData *>(inputBuf + sizeof(ConsoleCallServerData));
 				uint8_t *writeData = new uint8_t[request->dataSize];
 				ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(request->dataPtr), writeData, request->dataSize, nullptr);
+
+				if(requestData.data == 1)
+				{
+					//input is unicode
+					int size = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(writeData), request->dataSize / 2, nullptr, 0, 0, nullptr);
+					uint8_t *utf8Data = new uint8_t[size + 1];
+					WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(writeData), -1, reinterpret_cast<LPSTR>(utf8Data), size, 0, nullptr);
+
+					handleWrite(utf8Data, size);
+				}
+				else
+					handleWrite(writeData, request->dataSize);
+
 				delete [] writeData;
 
 				requestData.data = static_cast<uint32_t>(request->dataSize);
@@ -224,4 +244,14 @@ void ConsoleHost::handleDisconnected(ConsoleHostConnection *connection)
 
 void ConsoleHost::writeToConsole(const std::wstring &string)
 {
+}
+
+uint8_t *ConsoleHost::getInputBuffer(size_t requestSize, size_t *resultSize)
+{
+	return nullptr;
+}
+
+void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize)
+{
+
 }
