@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+class ConsoleEventListener;
 class ConsoleHostConnection;
 class ConsoleHost
 {
@@ -13,12 +14,13 @@ private:
 	void *childProcess_;
 	uint32_t childProcessId_;
 	ConsoleHostConnection *connection_;
+	ConsoleEventListener *listener_;
 
 	void cleanup();
 	uint8_t *getInputBuffer(size_t requestSize, size_t *resultSize);
 	void handleWrite(uint8_t *buffer, size_t bufferSize);
 public:
-	ConsoleHost(const std::wstring &process);
+	ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener);
 	~ConsoleHost();
 
 	void writeToConsole(const std::wstring &string);

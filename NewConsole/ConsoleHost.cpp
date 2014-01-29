@@ -6,8 +6,9 @@
 #include "ConsoleHostServer.h"
 #include "TargetProtocol.h"
 #include "Win32Structure.h"
+#include "ConsoleEventListener.h"
 
-ConsoleHost::ConsoleHost(const std::wstring &process)
+ConsoleHost::ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener) : listener_(listener)
 {
 	try
 	{
@@ -20,7 +21,7 @@ ConsoleHost::ConsoleHost(const std::wstring &process)
 		si.cb = sizeof(si);
 		si.dwFlags = STARTF_FORCEOFFFEEDBACK;
 
-		CreateProcess(nullptr, const_cast<wchar_t *>(process.c_str()), nullptr, nullptr, TRUE, CREATE_SUSPENDED, nullptr, nullptr, &si, &pi);
+		CreateProcess(nullptr, const_cast<wchar_t *>(cmdline.c_str()), nullptr, nullptr, TRUE, CREATE_SUSPENDED, nullptr, nullptr, &si, &pi);
 		childProcess_ = pi.hProcess;
 		childProcessId_ = pi.dwProcessId;
 
@@ -253,7 +254,7 @@ uint8_t *ConsoleHost::getInputBuffer(size_t requestSize, size_t *resultSize)
 
 void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize)
 {
-
+	listener_->handleWrite(buffer, bufferSize);
 }
 
 void ConsoleHost::setConnection(ConsoleHostConnection *connection)

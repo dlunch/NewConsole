@@ -3,7 +3,7 @@
 #include "ConsoleHost.h"
 #include "NewConsole.h"
 
-ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, NewConsole *mainWnd) : host_(new ConsoleHost(cmdline)), cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd)
+ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, NewConsole *mainWnd) : host_(new ConsoleHost(cmdline, this)), cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd)
 {
 }
 
