@@ -145,12 +145,16 @@
   <ItemGroup>
     <ClCompile Include="ConsoleHost.cpp" />
     <ClCompile Include="ConsoleHostServer.cpp" />
-    <ClCompile Include="NewConsoleMain.cpp" />
+    <ClCompile Include="ConsoleWnd.cpp" />
+    <ClCompile Include="NewConsole.cpp" />
     <ClCompile Include="Patcher.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ConsoleEventListener.h" />
     <ClInclude Include="ConsoleHost.h" />
     <ClInclude Include="ConsoleHostServer.h" />
+    <ClInclude Include="ConsoleWnd.h" />
+    <ClInclude Include="NewConsole.h" />
     <ClInclude Include="Patcher.h" />
     <ClInclude Include="TargetProtocol.h" />
     <ClInclude Include="TargetStub64.h" />
