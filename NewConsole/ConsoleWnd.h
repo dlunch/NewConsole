@@ -11,7 +11,7 @@
 
 class ConsoleHost;
 class NewConsole;
-class ConsoleWnd : public ConsoleEventListener
+class ConsoleWnd : public ConsoleEventListener, public std::enable_shared_from_this<ConsoleWnd>
 {
 private:
 	std::shared_ptr<ConsoleHost> host_;
@@ -23,13 +23,13 @@ private:
 	int cacheHeight_;
 
 	std::list<std::string> buffer_;
-	NewConsole *mainWnd_;
+	std::weak_ptr<NewConsole> mainWnd_;
 private:
 	virtual void handleWrite(uint8_t *buffer, size_t size);
 	void updateCache(int width, int height, int scrollx, int scrolly);
 
 public:
-	ConsoleWnd(const std::wstring &cmdline, NewConsole *mainWnd);
+	ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd);
 	~ConsoleWnd();
 
 	void drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly);

@@ -3,7 +3,8 @@
 #include "ConsoleHost.h"
 #include "NewConsole.h"
 
-ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, NewConsole *mainWnd) : host_(new ConsoleHost(cmdline, this)), cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd)
+ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd) : 
+	host_(new ConsoleHost(cmdline, this)), cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd)
 {
 }
 
@@ -15,7 +16,8 @@ void ConsoleWnd::handleWrite(uint8_t *buffer, size_t size)
 {
 	cacheWidth_ = -1; //invalidate cache
 	buffer_.push_back(std::string(buffer, buffer + size));
-	mainWnd_->contentsUpdated(this);
+	if(!mainWnd_.expired())
+		mainWnd_.lock()->contentsUpdated(shared_from_this());
 }
 
 void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)

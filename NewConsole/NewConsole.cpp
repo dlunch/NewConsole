@@ -37,7 +37,8 @@ int NewConsole::run(int nShowCmd)
 
 	ShowWindow(mainWnd_, nShowCmd);
 
-	ConsoleWnd wnd(L"C:\\windows\\system32\\cmd.exe", this);
+	consoles_.push_back(std::make_shared<ConsoleWnd>(L"C:\\windows\\system32\\cmd.exe", shared_from_this()));
+	activeConsole_ = *consoles_.begin();
 
 	MSG msg;
 	while(true)
@@ -57,8 +58,17 @@ int NewConsole::run(int nShowCmd)
 	return 0;
 }
 
-void NewConsole::contentsUpdated(ConsoleWnd *wnd)
+void NewConsole::contentsUpdated(std::weak_ptr<ConsoleWnd> wnd)
 {
+	if(wnd.lock() == activeConsole_.lock())
+		redraw();
+}
+
+void NewConsole::redraw()
+{
+	std::shared_ptr<ConsoleWnd> activeConsole = activeConsole_.lock();
+	if(!activeConsole)
+		return;
 	RECT rt;
 	GetWindowRect(mainWnd_, &rt);
 	int width = rt.right - rt.left;
@@ -71,7 +81,7 @@ void NewConsole::contentsUpdated(ConsoleWnd *wnd)
 	}
 	SelectObject(mainDC_, mainBitmap_);
 
-	wnd->drawScreenContents(mainDC_, 0, 0, width, height, 0, 0);
+	activeConsole->drawScreenContents(mainDC_, 0, 0, width, height, 0, 0);
 
 	BLENDFUNCTION bf;
 	bf.AlphaFormat = AC_SRC_ALPHA;
@@ -120,6 +130,6 @@ LRESULT CALLBACK NewConsole::WndProc_(HWND hWnd, UINT iMessage, WPARAM wParam, L
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-	NewConsole instance;
-	return instance.run(nShowCmd);	
+	std::shared_ptr<NewConsole> instance = std::make_shared<NewConsole>();
+	return instance->run(nShowCmd);	
 }
