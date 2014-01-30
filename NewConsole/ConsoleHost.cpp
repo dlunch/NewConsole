@@ -182,7 +182,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				uint8_t *writeData = new uint8_t[request->dataSize];
 				ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(request->dataPtr), writeData, request->dataSize, nullptr);
 
-				if(requestData.data == 1)
+				if(requestData.data)
 				{
 					//input is unicode
 					int size = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(writeData), request->dataSize / 2, nullptr, 0, 0, nullptr);

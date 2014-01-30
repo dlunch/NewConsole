@@ -64,9 +64,13 @@ void NewConsole::contentsUpdated(ConsoleWnd *wnd)
 	int width = rt.right - rt.left;
 	int height = rt.bottom - rt.top;
 	if(!mainBitmap_)
-		mainBitmap_ = CreateCompatibleBitmap(mainDC_, width, height);
+	{
+		HDC desktopDC = GetDC(nullptr);
+		mainBitmap_ = CreateCompatibleBitmap(desktopDC, width, height);
+		ReleaseDC(nullptr, desktopDC);
+	}
 	SelectObject(mainDC_, mainBitmap_);
-	
+
 	wnd->drawScreenContents(mainDC_, 0, 0, width, height, 0, 0);
 
 	BLENDFUNCTION bf;
@@ -75,7 +79,10 @@ void NewConsole::contentsUpdated(ConsoleWnd *wnd)
 	bf.BlendOp = AC_SRC_OVER;
 	bf.SourceConstantAlpha = 255;
 
-	UpdateLayeredWindow(mainWnd_, nullptr, nullptr, nullptr, mainDC_, nullptr, 0, &bf, ULW_ALPHA);
+	POINT pt = {0, 0};
+	POINT origin = {rt.left, rt.top};
+	SIZE size = {width, height};
+	UpdateLayeredWindow(mainWnd_, mainDC_, &origin, &size, mainDC_, &pt, RGB(0, 0, 0), &bf, ULW_ALPHA);
 }
 
 LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
