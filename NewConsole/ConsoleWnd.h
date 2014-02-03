@@ -30,6 +30,7 @@ private:
 	void updateCache(int width, int height, int scrollx, int scrolly);
 	void invalidateCache();
 	void bufferUpdated();
+	void appendStringToBuffer(const std::string &buffer);
 public:
 	ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd);
 	~ConsoleWnd();

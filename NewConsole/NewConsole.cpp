@@ -109,7 +109,12 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 		return 0;
 	case WM_CHAR:
 		if(!activeConsole_.expired())
-			activeConsole_.lock()->appendInputBuffer(std::string(1, static_cast<char>(wParam)));
+		{
+			char data = static_cast<char>(wParam);
+			if(data == '\r')
+				data = '\n';
+			activeConsole_.lock()->appendInputBuffer(std::string(1, data));
+		}
 		return 0;
 	}
 	return DefWindowProc(mainWnd_, iMessage, wParam, lParam);

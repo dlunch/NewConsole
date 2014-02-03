@@ -23,7 +23,7 @@ public:
 	ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener);
 	~ConsoleHost();
 
-	void writeToConsole(const std::wstring &string);
+	void writeToConsole(const std::string &string);
 	void handlePacket(uint16_t op, uint32_t size, uint8_t *data);
 	void handleDisconnected();
 	void setConnection(ConsoleHostConnection *connection);
