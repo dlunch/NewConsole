@@ -243,7 +243,7 @@ void ConsoleHost::handleDisconnected()
 
 }
 
-void ConsoleHost::writeToConsole(const std::string &string)
+void ConsoleHost::write(const std::string &string)
 {
 }
 

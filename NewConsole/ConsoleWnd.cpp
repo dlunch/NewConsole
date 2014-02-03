@@ -107,7 +107,7 @@ void ConsoleWnd::appendInputBuffer(const std::string &buffer)
 	{
 		inputBuffer_.pop_back();
 		inputBuffer_ += "\r\n";
-		host_->writeToConsole(inputBuffer_);
+		host_->write(inputBuffer_);
 		inputBuffer_.clear();
 	}
 }
