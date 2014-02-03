@@ -160,15 +160,16 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			ConsoleCallServerRequestData requestData;
 			ConsoleCallServerData *callData = reinterpret_cast<ConsoleCallServerData *>(inputBuf);
 			ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(callData->RequestDataPtr), &requestData, sizeof(ConsoleCallServerRequestData), nullptr);
+			uint32_t result = 0;
 
 			if(requestData.requestCode == 0x1000008) //SetTEBLangID
-				requestData.data = 0;
+				result = 0;
 			else if(requestData.requestCode == 0x1000000) //GetConsoleCP
-				requestData.data = CP_UTF8;
+				result = CP_UTF8;
 			else if(requestData.requestCode == 0x1000002) //SetConsoleMode
-				requestData.data = 0;
+				result = 0;
 			else if(requestData.requestCode == 0x1000001) //GetConsoleMode
-				requestData.data = 0;
+				result = 0;
 			else if(requestData.requestCode == 0x2000014) //GetConsoleTitle
 				__nop();
 			else if(requestData.requestCode == 0x2000007) //GetConsoleScreenBufferInfoEx
@@ -193,7 +194,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 
 				delete [] writeData;
 
-				requestData.data = static_cast<uint32_t>(request->dataSize);
+				result = static_cast<uint32_t>(request->dataSize);
 			}
 			else if(requestData.requestCode == 0x1000005) //ReadConsole
 			{
@@ -202,7 +203,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			else
 				__nop();
 
-			WriteProcessMemory(childProcess_, reinterpret_cast<LPVOID>(reinterpret_cast<size_t>(callData->RequestDataPtr) + 8), &requestData.data, sizeof(uint32_t), nullptr);
+			WriteProcessMemory(childProcess_, reinterpret_cast<LPVOID>(reinterpret_cast<size_t>(callData->RequestDataPtr) + 8), &result, sizeof(uint32_t), nullptr);
 
 			connection_->sendPacket(HandleDeviceIoControlFile);
 		}
