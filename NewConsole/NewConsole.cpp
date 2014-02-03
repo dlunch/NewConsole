@@ -107,6 +107,10 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 			DeleteObject(mainBitmap_);
 		mainBitmap_ = nullptr;
 		return 0;
+	case WM_CHAR:
+		if(!activeConsole_.expired())
+			activeConsole_.lock()->appendInputBuffer(std::string(1, static_cast<char>(wParam)));
+		return 0;
 	}
 	return DefWindowProc(mainWnd_, iMessage, wParam, lParam);
 }

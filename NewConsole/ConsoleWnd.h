@@ -23,14 +23,17 @@ private:
 	int cacheHeight_;
 
 	std::list<std::string> buffer_;
+	std::string inputBuffer_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
 	virtual void handleWrite(uint8_t *buffer, size_t size);
 	void updateCache(int width, int height, int scrollx, int scrolly);
-
+	void invalidateCache();
+	void bufferUpdated();
 public:
 	ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd);
 	~ConsoleWnd();
 
 	void drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly);
+	void appendInputBuffer(const std::string &buffer);
 };
