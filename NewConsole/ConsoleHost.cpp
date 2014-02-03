@@ -93,10 +93,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	{
 		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
 
-		size_t size;
-		uint8_t *buffer = getInputBuffer(request->readSize, &size);
-
-		connection_->sendPacket(HandleReadFile, buffer, size);
+		queueReadOperation(request->readSize, std::bind(&ConsoleHostConnection::sendPacketWithData, connection_, HandleReadFile, std::placeholders::_1, std::placeholders::_2), false);
 	}
 	else if(op == HandleWriteFile)
 	{
@@ -243,18 +240,55 @@ void ConsoleHost::handleDisconnected()
 
 }
 
-void ConsoleHost::write(const std::string &string)
+void ConsoleHost::write(const std::string &buffer)
 {
+	inputBuffer_ += buffer;
+
+	if(inputMode_ & ENABLE_ECHO_INPUT)
+		listener_->handleWrite(buffer);
+	checkQueuedRead();
 }
 
-uint8_t *ConsoleHost::getInputBuffer(size_t requestSize, size_t *resultSize)
+void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t)> &completion, bool isWidechar)
 {
-	return nullptr;
+	queuedReadOperations_.push_back(std::make_tuple(size, completion, isWidechar));
+	checkQueuedRead();
+}
+
+void ConsoleHost::checkQueuedRead()
+{
+	for(auto &i : queuedReadOperations_)
+	{
+		if(inputMode_ & ENABLE_LINE_INPUT)
+		{
+			size_t newlineOff = inputBuffer_.find("\r\n");
+			if(newlineOff == std::string::npos)
+				return;
+			newlineOff += 2;
+			std::string buffer(inputBuffer_.begin(), inputBuffer_.begin() + newlineOff);
+			inputBuffer_.erase(0, newlineOff);
+
+			if(std::get<2>(i) == true)
+			{
+				wchar_t *buf;
+				int len;
+
+				len = MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0);
+				buf = new wchar_t[len + 1];
+				MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, buf, len);
+				buf[len] = 0;
+
+				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), len * 2);
+			}
+			else
+				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size());
+		}
+	}
 }
 
 void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize)
 {
-	listener_->handleWrite(buffer, bufferSize);
+	listener_->handleWrite(std::string(buffer, buffer + bufferSize));
 }
 
 void ConsoleHost::setConnection(ConsoleHostConnection *connection)

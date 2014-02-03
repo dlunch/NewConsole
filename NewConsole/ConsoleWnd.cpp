@@ -15,7 +15,12 @@ ConsoleWnd::~ConsoleWnd()
 void ConsoleWnd::appendStringToBuffer(const std::string &buffer)
 {
 	std::string line;
-	int pos = 0;
+	if(lastLine_.size())
+	{
+		line = lastLine_;
+		buffer_.pop_back();
+	}
+	size_t pos = line.size();
 	for(size_t i = 0; i < buffer.size(); i ++)
 	{
 		if(buffer[i] == '\n')
@@ -37,13 +42,18 @@ void ConsoleWnd::appendStringToBuffer(const std::string &buffer)
 		}
 	}
 	if(line.size())
+	{
 		buffer_.push_back(line);
+		lastLine_ = line;
+	}
+	else
+		lastLine_.clear();
 	bufferUpdated();
 }
 
-void ConsoleWnd::handleWrite(uint8_t *buffer, size_t size)
+void ConsoleWnd::handleWrite(const std::string &buffer)
 {
-	appendStringToBuffer(std::string(buffer, buffer + size));
+	appendStringToBuffer(buffer);
 }
 
 void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
@@ -96,20 +106,13 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 
 void ConsoleWnd::appendInputBuffer(const std::string &buffer)
 {
-	std::string lastLine = *buffer_.rbegin();
-	buffer_.pop_back();
-	lastLine += buffer;
-	inputBuffer_ += buffer;
-
-	appendStringToBuffer(lastLine);
-
-	if(buffer[buffer.size() - 1] == '\n')
+	std::string buffer_(buffer);
+	if(buffer_[buffer_.size() - 1] == '\n')
 	{
-		inputBuffer_.pop_back();
-		inputBuffer_ += "\r\n";
-		host_->write(inputBuffer_);
-		inputBuffer_.clear();
+		buffer_.pop_back();
+		buffer_ += "\r\n";
 	}
+	host_->write(buffer_);
 }
 
 void ConsoleWnd::bufferUpdated()

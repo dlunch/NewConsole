@@ -18,10 +18,10 @@ private:
 	uint8_t *buf_;
 	size_t totalReceived_;
 	
-	void sendPacket_(uint32_t op, uint8_t *data, size_t size);
+	void sendPacket_(uint32_t op, const uint8_t *data, size_t size);
 	void readPacketHeader();
 
-	void writePipe(uint8_t *data, size_t size);
+	void writePipe(const uint8_t *data, size_t size);
 	void readPipe(uint8_t *buf, size_t size, OperationType type);
 	void headerReceived(IOOperation *op);
 	void dataReceived(IOOperation *op, size_t receivedSize);
@@ -40,7 +40,7 @@ public:
 	{
 		return sendPacket_(op, nullptr, 0);
 	}
-	void sendPacket(uint32_t op, uint8_t *data, size_t size)
+	void sendPacketWithData(uint32_t op, const uint8_t *data, size_t size)
 	{
 		return sendPacket_(op, data, size);
 	}

@@ -144,7 +144,7 @@ void ConsoleHostConnection::connected()
 	readPacketHeader();
 }
 
-void ConsoleHostConnection::writePipe(uint8_t *data, size_t size)
+void ConsoleHostConnection::writePipe(const uint8_t *data, size_t size)
 {
 	IOOperation *op = new IOOperation;
 	ZeroMemory(op, sizeof(IOOperation));
@@ -167,7 +167,7 @@ void ConsoleHostConnection::readPacketHeader()
 	readPipe(reinterpret_cast<uint8_t *>(header_), sizeof(PacketHeader), ReadHeader);
 }
 
-void ConsoleHostConnection::sendPacket_(uint32_t op, uint8_t *data, size_t size)
+void ConsoleHostConnection::sendPacket_(uint32_t op, const uint8_t *data, size_t size)
 {
 	PacketHeader header;
 	header.op = op;

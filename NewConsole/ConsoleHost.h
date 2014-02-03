@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <string>
+#include <functional>
+#include <list>
 
 class ConsoleEventListener;
 class ConsoleHostConnection;
@@ -15,15 +17,19 @@ private:
 	uint32_t childProcessId_;
 	ConsoleHostConnection *connection_;
 	ConsoleEventListener *listener_;
+	std::string inputBuffer_;
+
+	std::list<std::tuple<size_t, std::function<void (const uint8_t *, size_t)>, bool>> queuedReadOperations_;
 
 	void cleanup();
-	uint8_t *getInputBuffer(size_t requestSize, size_t *resultSize);
+	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t)> &completion, bool isWidechar);
+	void checkQueuedRead();
 	void handleWrite(uint8_t *buffer, size_t bufferSize);
 public:
 	ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener);
 	~ConsoleHost();
 
-	void write(const std::string &string);
+	void write(const std::string &buffer);
 	void handlePacket(uint16_t op, uint32_t size, uint8_t *data);
 	void handleDisconnected();
 	void setConnection(ConsoleHostConnection *connection);

@@ -23,10 +23,10 @@ private:
 	int cacheHeight_;
 
 	std::list<std::string> buffer_;
-	std::string inputBuffer_;
+	std::string lastLine_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
-	virtual void handleWrite(uint8_t *buffer, size_t size);
+	virtual void handleWrite(const std::string &buffer);
 	void updateCache(int width, int height, int scrollx, int scrolly);
 	void invalidateCache();
 	void bufferUpdated();
