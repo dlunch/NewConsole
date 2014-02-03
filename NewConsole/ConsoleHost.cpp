@@ -258,13 +258,14 @@ void ConsoleHost::queueReadOperation(size_t size, const std::function<void (cons
 
 void ConsoleHost::checkQueuedRead()
 {
-	for(auto &i : queuedReadOperations_)
+	while(queuedReadOperations_.size())
 	{
+		auto &i = queuedReadOperations_.front();
 		if(inputMode_ & ENABLE_LINE_INPUT)
 		{
 			size_t newlineOff = inputBuffer_.find("\r\n");
 			if(newlineOff == std::string::npos)
-				return;
+				break;
 			newlineOff += 2;
 			std::string buffer(inputBuffer_.begin(), inputBuffer_.begin() + newlineOff);
 			inputBuffer_.erase(0, newlineOff);
@@ -283,6 +284,8 @@ void ConsoleHost::checkQueuedRead()
 			}
 			else
 				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size());
+
+			queuedReadOperations_.pop_front();
 		}
 	}
 }
