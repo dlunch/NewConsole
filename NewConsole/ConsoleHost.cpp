@@ -8,7 +8,7 @@
 #include "Win32Structure.h"
 #include "ConsoleEventListener.h"
 
-ConsoleHost::ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener) : listener_(listener)
+ConsoleHost::ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0)
 {
 	try
 	{
@@ -76,7 +76,21 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		lstrcpyn(fileName, reinterpret_cast<LPCWSTR>(data + sizeof(HandleCreateFileRequest)), request->fileNameLen); //eabuffer follows.
 		fileName[request->fileNameLen / 2] = 0;
 
-		if(!wcsncmp(fileName, L"\\Device\\ConDrv", 14) || !wcsncmp(fileName, L"\\Input", 6) || !wcsncmp(fileName, L"\\Output", 7) || !wcsncmp(fileName, L"\\Reference", 10))
+		if(!wcsncmp(fileName, L"\\Input", 6))
+		{
+			response.returnFake = true;
+			response.fakeHandle = newFakeHandle();
+
+			inputHandles_.push_back(response.fakeHandle);
+		}
+		else if(!wcsncmp(fileName, L"\\Output", 7))
+		{
+			response.returnFake = true;
+			response.fakeHandle = newFakeHandle();
+
+			outputHandles_.push_back(response.fakeHandle);
+		}
+		else if(!wcsncmp(fileName, L"\\Device\\ConDrv", 14) || !wcsncmp(fileName, L"\\Reference", 10))
 			response.returnFake = true;	
 		else if(!wcsncmp(fileName, L"\\Connect", 8))
 		{
@@ -234,6 +248,41 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		response.callOriginal = true;
 		connection_->sendPacket(HandleLPCMessage, &response);
 	}
+	else if(op == HandleDuplicateObject)
+	{
+		HandleDuplicateObjectRequest *request = reinterpret_cast<HandleDuplicateObjectRequest *>(data);
+
+		HandleDuplicateObjectResponse response;
+		response.fakeHandle = newFakeHandle();
+
+		if(isOutputHandle(request->handle))
+			outputHandles_.push_back(response.fakeHandle);
+		else if(isInputHandle(request->handle))
+			inputHandles_.push_back(response.fakeHandle);
+
+		connection_->sendPacket(HandleDuplicateObject, &response);
+	}
+}
+
+uint32_t ConsoleHost::newFakeHandle()
+{
+	return (0xeeff00f3 | ((lastHandleId_ ++) << 8));
+}
+
+bool ConsoleHost::isInputHandle(uint32_t handle)
+{
+	for(auto &i : inputHandles_)
+		if(i == handle)
+			return true;
+	return false;
+}
+
+bool ConsoleHost::isOutputHandle(uint32_t handle)
+{
+	for(auto &i : outputHandles_)
+		if(i == handle)
+			return true;
+	return false;
 }
 
 void ConsoleHost::handleDisconnected()

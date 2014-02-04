@@ -46,7 +46,6 @@ struct TargetData
 	bool initialized;
 	void *pipeHandle;
 	void *parentProcess;
-	uint8_t lastHandleId;
 };
 
 extern "C" {
@@ -127,11 +126,6 @@ void *openPipe(TargetData *targetData)
 
 	targetData->originalNtCreateFile(&handle, FILE_GENERIC_READ | FILE_GENERIC_WRITE, &attributes, &statusBlock, 0, 0, 0, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, 0, 0);
 	return handle;
-}
-
-void *newFakeHandle(TargetData *targetData)
-{
-	return reinterpret_cast<void *>(0xeeff00f3 | ((targetData->lastHandleId ++) << 8));
 }
 
 bool isFakeHandle(void *handle)
@@ -239,7 +233,7 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 
 		if(response.returnFake)
 		{
-			*FileHandle = newFakeHandle(targetData);
+			*FileHandle = reinterpret_cast<void *>(response.fakeHandle);
 			IoStatusBlock->Information = reinterpret_cast<uint32_t *>(FILE_OPENED);
 			IoStatusBlock->Status = 0;
 			return 0;
@@ -355,7 +349,14 @@ uint32_t __stdcall HookedNtDuplicateObject(TargetData *targetData, void *SourceP
 {
 	if(isFakeHandle(SourceHandle) && TargetProcessHandle == NtCurrentProcess())
 	{
-		*TargetHandle = newFakeHandle(targetData);
+		HandleDuplicateObjectRequest request;
+		HandleDuplicateObjectResponse response;
+
+		request.handle = reinterpret_cast<uint32_t>(SourceHandle);
+		sendPacket(targetData, HandleDuplicateObject, &request);
+
+		recvPacket(targetData, &response);
+		*TargetHandle = reinterpret_cast<void *>(response.fakeHandle);
 		return 0;
 	}
 	return targetData->originalNtDuplicateObject(SourceProcessHandle, SourceHandle, TargetProcessHandle, TargetHandle, DesiredAccess, HandleAttributes, Options);
