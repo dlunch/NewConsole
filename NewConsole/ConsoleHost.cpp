@@ -172,9 +172,20 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			else if(requestData.requestCode == 0x1000000) //GetConsoleCP
 				result = CP_UTF8;
 			else if(requestData.requestCode == 0x1000002) //SetConsoleMode
+			{
+				if(isInputHandle(request->handle))
+					inputMode_ = requestData.data;
+				else if(isOutputHandle(request->handle))
+					outputMode_ = requestData.data;
 				result = 0;
+			}
 			else if(requestData.requestCode == 0x1000001) //GetConsoleMode
-				result = 0;
+			{
+				if(isInputHandle(request->handle))
+					result = inputMode_;
+				else if(isOutputHandle(request->handle))
+					result = outputMode_;
+			}
 			else if(requestData.requestCode == 0x2000014) //GetConsoleTitle
 				__nop();
 			else if(requestData.requestCode == 0x2000007) //GetConsoleScreenBufferInfoEx

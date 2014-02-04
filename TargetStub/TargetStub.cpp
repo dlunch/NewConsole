@@ -284,6 +284,7 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 	if(IoStatusBlock && isFakeHandle(FileHandle))
 	{
 		HandleDeviceIoControlFileRequest request;
+		request.handle = reinterpret_cast<uint32_t>(FileHandle);
 		request.code = static_cast<uint32_t>(IoControlCode);
 		
 		sendPacketHeader(targetData, HandleDeviceIoControlFile, sizeof(request) + static_cast<uint32_t>(InputBufferLength));

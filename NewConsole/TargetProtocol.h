@@ -54,6 +54,7 @@ struct HandleWriteFileResponse
 
 struct HandleDeviceIoControlFileRequest
 {
+	uint32_t handle;
 	uint32_t code;
 	//data follows
 };
