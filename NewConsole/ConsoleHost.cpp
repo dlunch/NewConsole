@@ -7,6 +7,7 @@
 #include "TargetProtocol.h"
 #include "Win32Structure.h"
 #include "ConsoleEventListener.h"
+#include "ConsoleInternal.h"
 
 ConsoleHost::ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0)
 {
@@ -135,59 +136,10 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		else if(request->code = 0x500016) //Win8.1: Called in ConsoleCallServerGeneric
 		{
 			//no output
-#pragma pack(push, 4)
-			struct ConsoleCallServerData
-			{
-				void *requestHandle;
-				uint32_t unk1;
-				uint32_t unk2;
-				uint32_t unk3;
-				uint32_t unk4;
-				void *requestDataPtr;
-			};
 
-			struct ConsoleCallServerGenericData
-			{
-				uint32_t unk1;
-				uint32_t unk2;
-				void *responsePtr;
-			};
-
-			struct ConsoleCallServerRequestData
-			{
-				uint32_t requestCode;
-				uint32_t unk;
-				uint32_t data;
-			};
-			struct WriteConsoleRequestData
-			{
-				uint32_t dataSize;
-				uint32_t unk;
-				void *dataPtr;
-				uint32_t unk1;
-				uint32_t unk2;
-				void *responsePtr;
-			};
-			struct ReadConsoleRequestData
-			{
-				uint32_t unk1;
-				uint32_t unk2;
-				void *unkPtr;
-				uint32_t unk3;
-				uint32_t unk4;
-				void *dataPtr2;
-				uint32_t unk5;
-				uint32_t unk6;
-				void *responsePtr;
-				uint32_t readSize;
-				uint32_t unk7;
-				void *dataPtr;
-			};
-#pragma pack(pop)
-
-			ConsoleCallServerRequestData requestData;
-			ConsoleCallServerData *callData = reinterpret_cast<ConsoleCallServerData *>(inputBuf);
-			ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(callData->requestDataPtr), &requestData, sizeof(ConsoleCallServerRequestData), nullptr);
+			NewConsoleCallServerRequestData requestData;
+			NewConsoleCallServerData *callData = reinterpret_cast<NewConsoleCallServerData *>(inputBuf);
+			ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(callData->requestDataPtr), &requestData, sizeof(NewConsoleCallServerRequestData), nullptr);
 			uint32_t result = 0;
 			void *responsePtr = nullptr;
 			bool noresult = false;
@@ -234,7 +186,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			}
 			else if(requestData.requestCode == 0x1000006) //WriteConsole
 			{
-				WriteConsoleRequestData *request = reinterpret_cast<WriteConsoleRequestData *>(inputBuf + sizeof(ConsoleCallServerData));
+				NewWriteConsoleRequestData *request = reinterpret_cast<NewWriteConsoleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
 				uint8_t *writeData = new uint8_t[request->dataSize];
 				ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(request->dataPtr), writeData, request->dataSize, nullptr);
 
@@ -257,7 +209,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			}
 			else if(requestData.requestCode == 0x1000005) //ReadConsole
 			{
-				ReadConsoleRequestData *request = reinterpret_cast<ReadConsoleRequestData *>(inputBuf + sizeof(ConsoleCallServerData));
+				NewReadConsoleRequestData *request = reinterpret_cast<NewReadConsoleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
 				noresult = true;
 
 				struct ReadConsoleData
@@ -287,7 +239,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			{
 				if(!responsePtr)
 				{
-					ConsoleCallServerGenericData *request = reinterpret_cast<ConsoleCallServerGenericData *>(inputBuf + sizeof(ConsoleCallServerData));
+					NewConsoleCallServerGenericData *request = reinterpret_cast<NewConsoleCallServerGenericData *>(inputBuf + sizeof(NewConsoleCallServerData));
 					responsePtr = request->responsePtr;
 				}
 
@@ -308,17 +260,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	}
 	else if(op == HandleLPCMessage)
 	{
-		LPC_MESSAGE *lpcHeader = reinterpret_cast<LPC_MESSAGE *>(data);
-
-		struct ConsoleAPIMessageHeader
-		{
-			size_t CsrCaptureData;
-			size_t ApiNumber;
-			uint32_t Status;
-			uint32_t Reserved;
-		};
-
-		ConsoleAPIMessageHeader *messageHeader = reinterpret_cast<ConsoleAPIMessageHeader *>(data + sizeof(LPC_MESSAGE));
+		ConsoleLPCMessageHeader *messageHeader = reinterpret_cast<ConsoleLPCMessageHeader *>(data);
 
 		HandleLPCMessageResponse response;
 		response.callOriginal = true;
