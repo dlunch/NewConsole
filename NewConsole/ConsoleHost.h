@@ -21,6 +21,7 @@ private:
 	int lastHandleId_;
 	std::list<uint32_t> inputHandles_;
 	std::list<uint32_t> outputHandles_;
+	std::list<uint32_t> serverHandles_;
 
 	std::list<std::tuple<size_t, std::function<void (const uint8_t *, size_t)>, bool>> queuedReadOperations_;
 

@@ -70,36 +70,27 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	{
 		HandleCreateFileRequest *request = reinterpret_cast<HandleCreateFileRequest *>(data);
 		HandleCreateFileResponse response;
-		response.returnFake = false;
+		response.returnFake = true;
+		response.fakeHandle = newFakeHandle();
 
 		wchar_t fileName[255];
 		lstrcpyn(fileName, reinterpret_cast<LPCWSTR>(data + sizeof(HandleCreateFileRequest)), request->fileNameLen); //eabuffer follows.
 		fileName[request->fileNameLen / 2] = 0;
 
 		if(!wcsncmp(fileName, L"\\Input", 6))
-		{
-			response.returnFake = true;
-			response.fakeHandle = newFakeHandle();
-
 			inputHandles_.push_back(response.fakeHandle);
-		}
 		else if(!wcsncmp(fileName, L"\\Output", 7))
-		{
-			response.returnFake = true;
-			response.fakeHandle = newFakeHandle();
-
 			outputHandles_.push_back(response.fakeHandle);
-		}
 		else if(!wcsncmp(fileName, L"\\Device\\ConDrv", 14) || !wcsncmp(fileName, L"\\Reference", 10))
-			response.returnFake = true;	
+			serverHandles_.push_back(response.fakeHandle);
 		else if(!wcsncmp(fileName, L"\\Connect", 8))
 		{
-			response.returnFake = true;
+			serverHandles_.push_back(response.fakeHandle);
 			void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
 			//TODO
 		}
 		else
-			__nop();
+			response.returnFake = false;
 
 		connection_->sendPacket(HandleCreateFile, &response);
 	}
