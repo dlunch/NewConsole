@@ -173,18 +173,20 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				result = CP_UTF8;
 			else if(requestData.requestCode == 0x1000002) //SetConsoleMode
 			{
-				if(isInputHandle(request->handle))
+				if(isInputHandle(callData->requestHandle))
 					inputMode_ = requestData.data;
-				else if(isOutputHandle(request->handle))
+				else if(isOutputHandle(callData->requestHandle))
 					outputMode_ = requestData.data;
 				result = 0;
 			}
 			else if(requestData.requestCode == 0x1000001) //GetConsoleMode
 			{
-				if(isInputHandle(request->handle))
+				if(isInputHandle(callData->requestHandle))
 					result = inputMode_;
-				else if(isOutputHandle(request->handle))
+				else if(isOutputHandle(callData->requestHandle))
 					result = outputMode_;
+				else
+					result = 0;
 			}
 			else if(requestData.requestCode == 0x2000014) //GetConsoleTitle
 				__nop();
@@ -266,12 +268,12 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	}
 }
 
-uint32_t ConsoleHost::newFakeHandle()
+void *ConsoleHost::newFakeHandle()
 {
-	return (0xeeff00f3 | ((lastHandleId_ ++) << 8));
+	return reinterpret_cast<void *>((0xeeff00f3 | ((lastHandleId_ ++) << 8)));
 }
 
-bool ConsoleHost::isInputHandle(uint32_t handle)
+bool ConsoleHost::isInputHandle(void *handle)
 {
 	for(auto &i : inputHandles_)
 		if(i == handle)
@@ -279,7 +281,7 @@ bool ConsoleHost::isInputHandle(uint32_t handle)
 	return false;
 }
 
-bool ConsoleHost::isOutputHandle(uint32_t handle)
+bool ConsoleHost::isOutputHandle(void *handle)
 {
 	for(auto &i : outputHandles_)
 		if(i == handle)

@@ -39,7 +39,7 @@ struct HandleCreateFileRequest
 struct HandleCreateFileResponse
 {
 	uint8_t returnFake;
-	uint32_t fakeHandle;
+	void *fakeHandle;
 };
 
 struct HandleReadFileRequest
@@ -54,7 +54,7 @@ struct HandleWriteFileResponse
 
 struct HandleDeviceIoControlFileRequest
 {
-	uint32_t handle;
+	void *handle;
 	uint32_t code;
 	//data follows
 };
@@ -72,12 +72,12 @@ struct HandleLPCMessageResponse
 
 struct HandleDuplicateObjectRequest
 {
-	uint32_t handle;
+	void *handle;
 };
 
 struct HandleDuplicateObjectResponse
 {
-	uint32_t fakeHandle;
+	void *fakeHandle;
 };
 
 #pragma pack(pop)

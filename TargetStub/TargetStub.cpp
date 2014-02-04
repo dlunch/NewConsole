@@ -284,7 +284,7 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 	if(IoStatusBlock && isFakeHandle(FileHandle))
 	{
 		HandleDeviceIoControlFileRequest request;
-		request.handle = reinterpret_cast<uint32_t>(FileHandle);
+		request.handle = FileHandle;
 		request.code = static_cast<uint32_t>(IoControlCode);
 		
 		sendPacketHeader(targetData, HandleDeviceIoControlFile, sizeof(request) + static_cast<uint32_t>(InputBufferLength));
@@ -353,7 +353,7 @@ uint32_t __stdcall HookedNtDuplicateObject(TargetData *targetData, void *SourceP
 		HandleDuplicateObjectRequest request;
 		HandleDuplicateObjectResponse response;
 
-		request.handle = reinterpret_cast<uint32_t>(SourceHandle);
+		request.handle = SourceHandle;
 		sendPacket(targetData, HandleDuplicateObject, &request);
 
 		recvPacket(targetData, &response);

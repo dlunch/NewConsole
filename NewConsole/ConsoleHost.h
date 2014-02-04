@@ -19,19 +19,19 @@ private:
 	ConsoleEventListener *listener_;
 	std::string inputBuffer_;
 	int lastHandleId_;
-	std::list<uint32_t> inputHandles_;
-	std::list<uint32_t> outputHandles_;
-	std::list<uint32_t> serverHandles_;
+	std::list<void *> inputHandles_;
+	std::list<void *> outputHandles_;
+	std::list<void *> serverHandles_;
 
 	std::list<std::tuple<size_t, std::function<void (const uint8_t *, size_t)>, bool>> queuedReadOperations_;
 
-	uint32_t newFakeHandle();
+	void *newFakeHandle();
 	void cleanup();
 	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t)> &completion, bool isWidechar);
 	void checkQueuedRead();
 	void handleWrite(uint8_t *buffer, size_t bufferSize);
-	bool isInputHandle(uint32_t handle);
-	bool isOutputHandle(uint32_t handle);
+	bool isInputHandle(void *handle);
+	bool isOutputHandle(void *handle);
 public:
 	ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener);
 	~ConsoleHost();
