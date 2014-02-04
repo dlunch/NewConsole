@@ -330,13 +330,13 @@ uint32_t __stdcall HookedNtCreateUserProcess(TargetData *targetData, void **Proc
 {
 	uint32_t result = targetData->originalNtCreateUserProcess(ProcessHandle, ThreadHandle, ProcessDesiredAccess, ThreadDesiredAccess, ProcessObjectAttributes, 
 															  ThreadObjectAttributes, ProcessFlags, ThreadFlags, ProcessParameters, CreateInfo, AttributeList);
-	if(result)
+	if(!result)
 	{
 		void *resultHandle;
-		targetData->originalNtDuplicateObject(NtCurrentProcess(), ProcessHandle, targetData->parentProcess, &resultHandle, 0, 0, DUPLICATE_SAME_ATTRIBUTES | DUPLICATE_SAME_ACCESS);
+		targetData->originalNtDuplicateObject(NtCurrentProcess(), *ProcessHandle, targetData->parentProcess, &resultHandle, 0, 0, DUPLICATE_SAME_ATTRIBUTES | DUPLICATE_SAME_ACCESS);
 		
 		HandleCreateUserProcessRequest request;
-		request.processHandle = reinterpret_cast<uint64_t>(resultHandle);
+		request.processHandle = resultHandle;
 		sendPacket(targetData, HandleCreateUserProcess, &request);
 		
 		PacketHeader header;

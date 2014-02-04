@@ -302,7 +302,9 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	{
 		HandleCreateUserProcessRequest *request = reinterpret_cast<HandleCreateUserProcessRequest *>(data);
 
-		request = request;
+		ConsoleHostServer::patchProcess(request->processHandle);
+		
+		connection_->sendPacket(HandleCreateUserProcess);
 	}
 	else if(op == HandleLPCMessage)
 	{

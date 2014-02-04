@@ -62,7 +62,7 @@ struct HandleDeviceIoControlFileRequest
 //this method will be sent after proecss creation.
 struct HandleCreateUserProcessRequest
 {
-	uint64_t processHandle;
+	void *processHandle;
 };
 
 struct HandleLPCMessageResponse
