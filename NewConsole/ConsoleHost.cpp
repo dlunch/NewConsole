@@ -98,7 +98,9 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	{
 		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
 
-		queueReadOperation(request->readSize, std::bind(&ConsoleHostConnection::sendPacketWithData, connection_, HandleReadFile, std::placeholders::_1, std::placeholders::_2), false);
+		queueReadOperation(request->readSize, 
+						   std::bind(&ConsoleHostConnection::sendPacketWithData, connection_, HandleReadFile, std::placeholders::_1, std::placeholders::_2), 
+						   false, nullptr);
 	}
 	else if(op == HandleWriteFile)
 	{
@@ -141,7 +143,14 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				uint32_t unk2;
 				uint32_t unk3;
 				uint32_t unk4;
-				void *RequestDataPtr;
+				void *requestDataPtr;
+			};
+
+			struct ConsoleCallServerGenericData
+			{
+				uint32_t unk1;
+				uint32_t unk2;
+				void *responsePtr;
 			};
 
 			struct ConsoleCallServerRequestData
@@ -157,15 +166,31 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				void *dataPtr;
 				uint32_t unk1;
 				uint32_t unk2;
+				void *responsePtr;
+			};
+			struct ReadConsoleRequestData
+			{
+				uint32_t unk1;
+				uint32_t unk2;
+				void *unkPtr;
 				uint32_t unk3;
 				uint32_t unk4;
+				void *dataPtr2;
+				uint32_t unk5;
+				uint32_t unk6;
+				void *responsePtr;
+				uint32_t readSize;
+				uint32_t unk7;
+				void *dataPtr;
 			};
 #pragma pack(pop)
 
 			ConsoleCallServerRequestData requestData;
 			ConsoleCallServerData *callData = reinterpret_cast<ConsoleCallServerData *>(inputBuf);
-			ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(callData->RequestDataPtr), &requestData, sizeof(ConsoleCallServerRequestData), nullptr);
+			ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(callData->requestDataPtr), &requestData, sizeof(ConsoleCallServerRequestData), nullptr);
 			uint32_t result = 0;
+			void *responsePtr = nullptr;
+			bool noresult = false;
 
 			if(requestData.requestCode == 0x1000008) //SetTEBLangID
 				result = 0;
@@ -213,17 +238,47 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				delete [] writeData;
 
 				result = static_cast<uint32_t>(request->dataSize);
+				responsePtr = request->responsePtr;
 			}
 			else if(requestData.requestCode == 0x1000005) //ReadConsole
 			{
-				__nop();
+				ReadConsoleRequestData *request = reinterpret_cast<ReadConsoleRequestData *>(inputBuf + sizeof(ConsoleCallServerData));
+				noresult = true;
+
+				struct ReadConsoleData
+				{
+					void *responsePtr;
+					void *dataPtr;
+				};
+				ReadConsoleData *userData = new ReadConsoleData;
+				userData->responsePtr = request->responsePtr;
+				userData->dataPtr = request->dataPtr;
+
+				queueReadOperation(request->readSize, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
+					ReadConsoleData *readData = reinterpret_cast<ReadConsoleData *>(userData);
+
+					WriteProcessMemory(childProcess_, readData->dataPtr, buffer, bufferSize, nullptr);
+					WriteProcessMemory(childProcess_, readData->responsePtr, &nChar, sizeof(uint32_t), nullptr);
+					connection_->sendPacket(HandleDeviceIoControlFile);
+
+					delete readData;
+				}
+				, (requestData.data > 0), userData);
 			}
 			else
 				__nop();
 
-			WriteProcessMemory(childProcess_, reinterpret_cast<LPVOID>(reinterpret_cast<size_t>(callData->RequestDataPtr) + 8), &result, sizeof(uint32_t), nullptr);
+			if(!responsePtr)
+			{
+				ConsoleCallServerGenericData *request = reinterpret_cast<ConsoleCallServerGenericData *>(inputBuf + sizeof(ConsoleCallServerData));
+				responsePtr = request->responsePtr;
+			}
 
-			connection_->sendPacket(HandleDeviceIoControlFile);
+			if(!noresult)
+			{
+				WriteProcessMemory(childProcess_, responsePtr, &result, sizeof(uint32_t), nullptr);
+				connection_->sendPacket(HandleDeviceIoControlFile);
+			}
 		}
 		else
 			__debugbreak();
@@ -303,9 +358,9 @@ void ConsoleHost::write(const std::string &buffer)
 	checkQueuedRead();
 }
 
-void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t)> &completion, bool isWidechar)
+void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWidechar, void *userData)
 {
-	queuedReadOperations_.push_back(std::make_tuple(size, completion, isWidechar));
+	queuedReadOperations_.push_back(std::make_tuple(size, completion, isWidechar, userData));
 	checkQueuedRead();
 }
 
@@ -329,14 +384,14 @@ void ConsoleHost::checkQueuedRead()
 				int len;
 
 				len = MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0);
-				buf = new wchar_t[len + 1];
+				buf = new wchar_t[len];
 				MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, buf, len);
-				buf[len] = 0;
+				buf[len - 1] = 0;
 
-				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), len * 2);
+				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), (len - 1) * 2, len - 1, std::get<3>(i));
 			}
 			else
-				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size());
+				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size(), buffer.size(), std::get<3>(i));
 
 			queuedReadOperations_.pop_front();
 		}

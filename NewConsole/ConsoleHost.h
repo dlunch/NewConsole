@@ -23,11 +23,11 @@ private:
 	std::list<void *> outputHandles_;
 	std::list<void *> serverHandles_;
 
-	std::list<std::tuple<size_t, std::function<void (const uint8_t *, size_t)>, bool>> queuedReadOperations_;
+	std::list<std::tuple<size_t, std::function<void (const uint8_t *, size_t, size_t, void *)>, bool, void *>> queuedReadOperations_;
 
 	void *newFakeHandle();
 	void cleanup();
-	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t)> &completion, bool isWidechar);
+	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWidechar, void *userData);
 	void checkQueuedRead();
 	void handleWrite(uint8_t *buffer, size_t bufferSize);
 	bool isInputHandle(void *handle);
