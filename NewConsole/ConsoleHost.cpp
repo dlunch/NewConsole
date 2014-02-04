@@ -389,6 +389,7 @@ void ConsoleHost::checkQueuedRead()
 				buf[len - 1] = 0;
 
 				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), (len - 1) * 2, len - 1, std::get<3>(i));
+				delete [] buf;
 			}
 			else
 				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size(), buffer.size(), std::get<3>(i));
