@@ -15,7 +15,7 @@ typedef uint32_t (__stdcall *NtReadFile)(void *FileHandle, void *Event, void *Ap
 typedef uint32_t (__stdcall *NtDeviceIoControlFile)(void *FileHandle, void *Event, void *ApcRoutine, void *ApcContext, PIO_STATUS_BLOCK IoStatusBlock, 
 												  size_t IoControlCode, void *InputBuffer, size_t InputBufferLength, void *OutputBuffer, size_t OutputBufferLength);
 typedef uint32_t (__stdcall *NtQueryVolumeInformationFile)(void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
-														   size_t Length, size_t FileSystemInformationClass);
+														   size_t Length, int FileSystemInformationClass);
 typedef uint32_t (__stdcall *NtCreateUserProcess)(void **ProcessHandle, void **ThreadHandle, size_t ProcessDesiredAccess, size_t ThreadDesiredAccess, 
 												  POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, size_t ProcessFlags, 
 												  size_t ThreadFlags, PRTL_USER_PROCESS_PARAMETERS ProcessParameters, size_t CreateInfo, size_t AttributeList);
@@ -64,7 +64,7 @@ __declspec(dllexport) uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData 
 																	 PIO_STATUS_BLOCK IoStatusBlock,  size_t IoControlCode, void *InputBuffer, size_t InputBufferLength,
 																	 void *OutputBuffer, size_t OutputBufferLength);
 __declspec(dllexport) uint32_t __stdcall HookedNtQueryVolumeInformationFile(TargetData *targetData, void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
-																			size_t Length, size_t FileSystemInformationClass);
+																			size_t Length, int FileSystemInformationClass);
 __declspec(dllexport) uint32_t __stdcall HookedNtCreateUserProcess(TargetData *targetData, void **ProcessHandle, void **ThreadHandle, size_t ProcessDesiredAccess, 
 																   size_t ThreadDesiredAccess, POBJECT_ATTRIBUTES ProcessObjectAttributes, 
 																   POBJECT_ATTRIBUTES ThreadObjectAttributes, size_t ProcessFlags,  size_t ThreadFlags, 
@@ -308,7 +308,7 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 }
 
 uint32_t __stdcall HookedNtQueryVolumeInformationFile(TargetData *targetData, void *FileHandle, PIO_STATUS_BLOCK IoStatusBlock, void **FileSystemInformation, 
-													  size_t Length, size_t FileSystemInformationClass)
+													  size_t Length, int FileSystemInformationClass)
 {
 	if(IoStatusBlock && isFakeHandle(FileHandle))
 	{
