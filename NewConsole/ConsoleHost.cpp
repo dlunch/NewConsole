@@ -216,7 +216,22 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			else if(requestData.requestCode == 0x2000014) //GetConsoleTitle
 				__nop();
 			else if(requestData.requestCode == 0x2000007) //GetConsoleScreenBufferInfoEx
-				__nop();
+			{
+				struct ResponseStruct
+				{
+					uint32_t unk;
+					uint32_t unk1;
+					COORD size;
+					COORD cursorPos;
+				};
+				noresult = true;
+				ResponseStruct response;
+				ZeroMemory(&response, sizeof(response));
+				response.size.X = 80;
+				response.size.Y = 24;
+				WriteProcessMemory(childProcess_, responsePtr, &response, sizeof(response), nullptr);
+				connection_->sendPacket(HandleDeviceIoControlFile);
+			}
 			else if(requestData.requestCode == 0x1000006) //WriteConsole
 			{
 				WriteConsoleRequestData *request = reinterpret_cast<WriteConsoleRequestData *>(inputBuf + sizeof(ConsoleCallServerData));
