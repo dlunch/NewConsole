@@ -111,7 +111,7 @@ void ConsoleHostServer::patchProcess(void *processHandle)
 
 ConsoleHost *ConsoleHostServer::findConsoleHostByPid(uint32_t pid)
 {
-	ConsoleHost *foundHost;
+	ConsoleHost *foundHost = nullptr;
 	for(auto &i : consoleHostServerData_->waitingHosts)
 	{
 		if(i->childProcessId_ == pid)
