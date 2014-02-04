@@ -268,14 +268,14 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			else
 				__nop();
 
-			if(!responsePtr)
-			{
-				ConsoleCallServerGenericData *request = reinterpret_cast<ConsoleCallServerGenericData *>(inputBuf + sizeof(ConsoleCallServerData));
-				responsePtr = request->responsePtr;
-			}
-
 			if(!noresult)
 			{
+				if(!responsePtr)
+				{
+					ConsoleCallServerGenericData *request = reinterpret_cast<ConsoleCallServerGenericData *>(inputBuf + sizeof(ConsoleCallServerData));
+					responsePtr = request->responsePtr;
+				}
+
 				WriteProcessMemory(childProcess_, responsePtr, &result, sizeof(uint32_t), nullptr);
 				connection_->sendPacket(HandleDeviceIoControlFile);
 			}
