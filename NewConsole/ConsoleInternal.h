@@ -78,8 +78,6 @@ struct ConsoleLPCMessageHeader
 	uint32_t Reserved;
 };
 
-#pragma pack(pop)
-
 enum CSRSSAPI
 {
 	CSRSSApiOpenConsole,
@@ -93,3 +91,31 @@ enum CSRSSAPI
 	CSRSSApiVerifyConsoleIoHandle,
 	CSRSSApiGetConsoleCP,
 };
+
+struct CSRSSGetSetConsoleModeData
+{
+	void *handle;
+	uint32_t mode;
+};
+
+struct CSRSSGetSetCPData
+{
+	uint32_t isInput;
+	uint32_t codepage;
+};
+
+struct CSRSSConsoleClientConnectData
+{
+	void *consoleHandle;	//0		//0
+	size_t unk;				//8		//4
+	void *inputHandle;		//16	//8
+	void *outputHandle;		//24	//12
+	void *errorHandle;		//32	//16
+	size_t unk2;			//40	//20
+	size_t unk3;			//48	//24
+	size_t unk4;			//56	//28
+	uint32_t unk5;			//64	//32
+	uint32_t flag;			//68	//36
+};
+
+#pragma pack(pop)

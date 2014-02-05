@@ -370,6 +370,18 @@ uint32_t __stdcall HookedNtClose(TargetData *targetData, void *Handle)
 	return targetData->originalNtClose(Handle);
 }
 
+void onConnectPort(TargetData *targetData, void *serverBase, void *clientBase)
+{
+	LPCConnectRequest request;
+	request.clientBase = reinterpret_cast<size_t>(clientBase);
+	request.serverBase = reinterpret_cast<size_t>(serverBase);
+
+	sendPacket(targetData, HandleLPCConnect, &request);
+
+	PacketHeader header;
+	recvPacketHeader(targetData, &header);
+}
+
 uint32_t __stdcall HookedNtConnectPort(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos, 
 									   PLPC_SECTION_OWNER_MEMORY ClientSharedMemory, PLPC_SECTION_MEMORY ServerSharedMemory, size_t *MaximumMessageLength, 
 									   void *ConnectionInfo, size_t *ConnectionInfoLength)
@@ -377,8 +389,10 @@ uint32_t __stdcall HookedNtConnectPort(TargetData *targetData, void **ClientPort
 	if(!targetData->initialized)
 		initialize(targetData);
 
-	return targetData->originalNtConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, ServerSharedMemory, MaximumMessageLength, 
-											 ConnectionInfo, ConnectionInfoLength);
+	uint32_t ret = targetData->originalNtConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, ServerSharedMemory, MaximumMessageLength, 
+													 ConnectionInfo, ConnectionInfoLength);
+	onConnectPort(targetData, ClientSharedMemory->OtherSideViewBase, ClientSharedMemory->ViewBase);
+	return ret;
 }
 
 uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos,
@@ -388,13 +402,18 @@ uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **Clie
 	if(!targetData->initialized)
 		initialize(targetData);
 
-	return targetData->originalNtSecureConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, Sid, ServerSharedMemory, 
-												   MaximumMessageLength, ConnectionInfo, ConnectionInfoLength);
+	uint32_t ret = targetData->originalNtSecureConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, Sid, ServerSharedMemory, 
+														   MaximumMessageLength, ConnectionInfo, ConnectionInfoLength);
+	onConnectPort(targetData, ClientSharedMemory->OtherSideViewBase, ClientSharedMemory->ViewBase);
+	return ret;
 }
 
 uint32_t __stdcall HookedNtRequestWaitReplyPort(TargetData *targetData, void *PortHandle, PLPC_MESSAGE Request, PLPC_MESSAGE IncomingReply)
 {
-	sendPacketHeader(targetData, HandleLPCMessage, Request->Length);
+	HandleLPCMessageRequest request;
+	request.requestPointer = Request;
+	sendPacketHeader(targetData, HandleLPCMessage, Request->Length + sizeof(request));
+	sendPacketData(targetData, &request, sizeof(request));
 	sendPacketData(targetData, Request, Request->Length);
 
 	PacketHeader header;

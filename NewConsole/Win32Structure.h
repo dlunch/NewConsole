@@ -878,12 +878,21 @@ typedef struct _LPC_MESSAGE {
 
 } LPC_MESSAGE, *PLPC_MESSAGE;
 
+typedef struct _CSR_CAPTURE_BUFFER
+{
+    uint32_t Size;
+    struct _CSR_CAPTURE_BUFFER *PreviousCaptureBuffer;
+    uint32_t PointerCount;
+    void *BufferEnd;
+    size_t PointerOffsetsArray[1];
+} CSR_CAPTURE_BUFFER, *PCSR_CAPTURE_BUFFER;
+
 typedef struct _LPC_SECTION_OWNER_MEMORY {
 
-	uint32_t Length; 
+	size_t Length; 
 	void *SectionHandle; 
-	uint32_t OffsetInSection; 
-	uint32_t ViewSize; 
+	size_t OffsetInSection; 
+	size_t ViewSize; 
 	void *ViewBase; 
 	void *OtherSideViewBase;
 
@@ -891,8 +900,8 @@ typedef struct _LPC_SECTION_OWNER_MEMORY {
 
 typedef struct _LPC_SECTION_MEMORY {
 
-	uint32_t Length; 
-	uint32_t ViewSize; 
+	size_t Length; 
+	size_t ViewSize; 
 	void *ViewBase;
 
 } LPC_SECTION_MEMORY, *PLPC_SECTION_MEMORY;

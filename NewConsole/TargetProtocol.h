@@ -16,6 +16,7 @@ enum PacketOp
 	HandleWriteFile,
 	HandleDeviceIoControlFile,
 	HandleCreateUserProcess,
+	HandleLPCConnect,
 	HandleLPCMessage,
 	HandleDuplicateObject,
 };
@@ -65,6 +66,11 @@ struct HandleCreateUserProcessRequest
 	void *processHandle;
 };
 
+struct HandleLPCMessageRequest
+{
+	void *requestPointer;
+};
+
 struct HandleLPCMessageResponse
 {
 	uint8_t callOriginal;
@@ -78,6 +84,12 @@ struct HandleDuplicateObjectRequest
 struct HandleDuplicateObjectResponse
 {
 	void *fakeHandle;
+};
+
+struct LPCConnectRequest
+{
+	size_t serverBase;
+	size_t clientBase;
 };
 
 #pragma pack(pop)
