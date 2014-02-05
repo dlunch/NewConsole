@@ -338,10 +338,12 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			CSRSSConsoleClientConnectData *connectData = reinterpret_cast<CSRSSConsoleClientConnectData *>(
 				getCSRSSCaptureBuffer(messageHeader, request->requestPointer, buffer, 0));
 
+			connectData->consoleHandle = newFakeHandle();
 			connectData->inputHandle = newFakeHandle();
 			connectData->outputHandle = newFakeHandle();
 			connectData->errorHandle = newFakeHandle();
 
+			serverHandles_.push_back(connectData->consoleHandle);
 			inputHandles_.push_back(connectData->inputHandle);
 			outputHandles_.push_back(connectData->outputHandle);
 			outputHandles_.push_back(connectData->errorHandle);
