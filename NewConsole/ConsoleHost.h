@@ -29,7 +29,7 @@ private:
 	void cleanup();
 	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWidechar, void *userData);
 	void checkQueuedRead();
-	void handleWrite(uint8_t *buffer, size_t bufferSize);
+	void handleWrite(uint8_t *buffer, size_t bufferSize, bool unicode);
 	bool isInputHandle(void *handle);
 	bool isOutputHandle(void *handle);
 	void sendNewConsoleAPIResponse(void *responsePtr, void *buffer, size_t bufferSize);

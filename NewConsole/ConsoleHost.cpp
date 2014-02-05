@@ -113,7 +113,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	{
 		uint8_t *buf = reinterpret_cast<uint8_t *>(data);
 
-		handleWrite(buf, size);
+		handleWrite(buf, size, false);
 
 		HandleWriteFileResponse response;
 		response.writtenSize = size;
@@ -187,17 +187,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				uint8_t *writeData = new uint8_t[request->dataSize];
 				ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(request->dataPtr), writeData, request->dataSize, nullptr);
 
-				if(requestData.data1)
-				{
-					//input is unicode
-					int size = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(writeData), request->dataSize / 2, nullptr, 0, 0, nullptr);
-					uint8_t *utf8Data = new uint8_t[size + 1];
-					WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(writeData), -1, reinterpret_cast<LPSTR>(utf8Data), size, 0, nullptr);
-
-					handleWrite(utf8Data, size);
-				}
-				else
-					handleWrite(writeData, request->dataSize);
+				handleWrite(writeData, request->dataSize, (requestData.data1 == 1));
 
 				delete [] writeData;
 
@@ -340,9 +330,19 @@ void ConsoleHost::checkQueuedRead()
 	}
 }
 
-void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize)
+void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool unicode)
 {
-	listener_->handleWrite(std::string(buffer, buffer + bufferSize));
+	std::string stringBuf;
+	if(unicode)
+	{
+		//input is unicode
+		int size = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(buffer), static_cast<int>(bufferSize / 2), nullptr, 0, 0, nullptr);
+		stringBuf.resize(size);
+		WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(buffer), static_cast<int>(bufferSize / 2), reinterpret_cast<LPSTR>(&stringBuf[0]), size, 0, nullptr);
+	}
+	else
+		stringBuf.assign(buffer, buffer + bufferSize);
+	listener_->handleWrite(stringBuf);
 }
 
 void ConsoleHost::setConnection(ConsoleHostConnection *connection)
