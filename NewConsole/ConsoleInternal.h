@@ -110,6 +110,33 @@ struct CSRSSVerifyConsoleIoHandleData
 	void *handle;
 };
 
+struct CSRSSWriteConsoleData
+{
+	void *handle;
+	uint8_t data[0x50];
+	void *dataPtr;
+	size_t dataSize;
+	size_t unk;
+	uint8_t isEmbedded;
+	uint8_t isUnicode;
+};
+
+#pragma pack(push, 1)
+struct CSRSSReadConsoleData
+{
+	void *handle;
+	uint16_t exeNameSize;
+	uint8_t data[0x56];
+	void *dataPtr;
+	uint32_t sizeToRead;
+	uint32_t sizeRead;
+	uint32_t unk1;
+	uint32_t unk2;
+	uint32_t unk3;
+	uint8_t isUnicode;
+};
+#pragma pack(pop)
+
 struct CSRSSConsoleClientConnectData
 {
 	void *consoleHandle;	//0		//0

@@ -10,7 +10,7 @@
 #include "ConsoleInternal.h"
 
 //OpenConsole, GetConsoleMode, SetConsoleMode, ReadConsole, WriteConsole, GetConsoleTitle, GetConsoleScreenBufferInfo, GetConsoleLangId, VerifyConsoleIoHandle, GetConsoleCP
-const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0x68, 0x4c, 0x23, 0x3c};
+const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0xb, 0x4c, 0x23, 0x3c};
 const uint16_t *g_csrssAPITable;
 
 ConsoleHost::ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0)
@@ -303,10 +303,12 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiReadConsole])
 		{
+			CSRSSReadConsoleData *data = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
 		{
+			CSRSSWriteConsoleData *data = reinterpret_cast<CSRSSWriteConsoleData *>(dataPtr);
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleTitle])
