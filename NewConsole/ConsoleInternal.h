@@ -54,6 +54,20 @@ struct NewReadConsoleRequestData
 	void *dataPtr;
 };
 
+struct NewGetConsoleScreenBufferInfoExResponse
+{
+	COORD size;					//+0
+	COORD cursorPos;			//+4
+	COORD tlcoord;				//+8
+	uint16_t attribute;			//+12
+	COORD brcoord;				//+14
+	COORD maxWindowSize;		//+18
+	uint16_t popupAttributes;	//+22
+	uint8_t fullscreenSupported;//+24
+	uint8_t pad1;				//+25
+	uint16_t pad2;				//+27
+	uint32_t colorTable[16];	//+28
+};
 struct ConsoleLPCMessageHeader
 {
 	LPC_MESSAGE LPCHeader;

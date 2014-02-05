@@ -175,14 +175,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				sendNewConsoleAPIResponse(genericRequest->responsePtr, 0);
 			else if(requestData.requestCode == 0x2000007) //GetConsoleScreenBufferInfoEx
 			{
-				struct ResponseStruct
-				{
-					uint32_t unk;
-					uint32_t unk1;
-					COORD size;
-					COORD cursorPos;
-				};
-				ResponseStruct response;
+				NewGetConsoleScreenBufferInfoExResponse response;
 				ZeroMemory(&response, sizeof(response));
 				response.size.X = 80;
 				response.size.Y = 24;
