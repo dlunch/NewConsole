@@ -323,6 +323,10 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiVerifyConsoleIoHandle])
 		{
+			CSRSSVerifyConsoleIoHandleData *data = reinterpret_cast<CSRSSVerifyConsoleIoHandleData *>(dataPtr);
+
+			data->result = 1;
+			messageHeader->Status = 0;
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleCP])

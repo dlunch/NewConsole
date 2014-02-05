@@ -104,6 +104,12 @@ struct CSRSSGetSetCPData
 	uint32_t codepage;
 };
 
+struct CSRSSVerifyConsoleIoHandleData
+{
+	size_t result;
+	void *handle;
+};
+
 struct CSRSSConsoleClientConnectData
 {
 	void *consoleHandle;	//0		//0
