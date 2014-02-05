@@ -54,6 +54,12 @@ ConsoleHost::~ConsoleHost()
 	cleanup();
 }
 
+void ConsoleHost::sendNewConsoleAPIResponse(void *responsePtr, void *buffer, size_t bufferSize)
+{
+	WriteProcessMemory(childProcess_, responsePtr, buffer, bufferSize, nullptr);
+	connection_->sendPacket(HandleDeviceIoControlFile);
+}
+
 void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 {
 	if(op == Initialize)
@@ -71,7 +77,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	{
 		HandleCreateFileRequest *request = reinterpret_cast<HandleCreateFileRequest *>(data);
 		HandleCreateFileResponse response;
-		response.returnFake = true;
+		response.returnFake = 1;
 		response.fakeHandle = newFakeHandle();
 
 		wchar_t fileName[255];
@@ -91,7 +97,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			//TODO
 		}
 		else
-			response.returnFake = false;
+			response.returnFake = 0;
 
 		connection_->sendPacket(HandleCreateFile, &response);
 	}
@@ -139,34 +145,34 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 
 			NewConsoleCallServerRequestData requestData;
 			NewConsoleCallServerData *callData = reinterpret_cast<NewConsoleCallServerData *>(inputBuf);
+			NewConsoleCallServerGenericData *genericRequest = reinterpret_cast<NewConsoleCallServerGenericData *>(inputBuf + sizeof(NewConsoleCallServerData));
 			ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(callData->requestDataPtr), &requestData, sizeof(NewConsoleCallServerRequestData), nullptr);
-			uint32_t result = 0;
-			void *responsePtr = nullptr;
-			bool noresult = false;
 
 			if(requestData.requestCode == 0x1000008) //SetTEBLangID
-				result = 0;
+				sendNewConsoleAPIResponse(genericRequest->responsePtr, 0);
 			else if(requestData.requestCode == 0x1000000) //GetConsoleCP
-				result = CP_UTF8;
+				sendNewConsoleAPIResponse(genericRequest->responsePtr, CP_UTF8);
 			else if(requestData.requestCode == 0x1000002) //SetConsoleMode
 			{
 				if(isInputHandle(callData->requestHandle))
 					inputMode_ = requestData.data;
 				else if(isOutputHandle(callData->requestHandle))
 					outputMode_ = requestData.data;
-				result = 0;
+				sendNewConsoleAPIResponse(genericRequest->responsePtr, 0);
 			}
 			else if(requestData.requestCode == 0x1000001) //GetConsoleMode
 			{
+				uint32_t result;
 				if(isInputHandle(callData->requestHandle))
 					result = inputMode_;
 				else if(isOutputHandle(callData->requestHandle))
 					result = outputMode_;
 				else
 					result = 0;
+				sendNewConsoleAPIResponse(genericRequest->responsePtr, result);
 			}
 			else if(requestData.requestCode == 0x2000014) //GetConsoleTitle
-				__nop();
+				sendNewConsoleAPIResponse(genericRequest->responsePtr, 0);
 			else if(requestData.requestCode == 0x2000007) //GetConsoleScreenBufferInfoEx
 			{
 				struct ResponseStruct
@@ -176,13 +182,11 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 					COORD size;
 					COORD cursorPos;
 				};
-				noresult = true;
 				ResponseStruct response;
 				ZeroMemory(&response, sizeof(response));
 				response.size.X = 80;
 				response.size.Y = 24;
-				WriteProcessMemory(childProcess_, responsePtr, &response, sizeof(response), nullptr);
-				connection_->sendPacket(HandleDeviceIoControlFile);
+				sendNewConsoleAPIResponse(genericRequest->responsePtr, &response, sizeof(response));
 			}
 			else if(requestData.requestCode == 0x1000006) //WriteConsole
 			{
@@ -190,7 +194,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				uint8_t *writeData = new uint8_t[request->dataSize];
 				ReadProcessMemory(childProcess_, reinterpret_cast<LPCVOID>(request->dataPtr), writeData, request->dataSize, nullptr);
 
-				if(requestData.data)
+				if(requestData.data1)
 				{
 					//input is unicode
 					int size = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(writeData), request->dataSize / 2, nullptr, 0, 0, nullptr);
@@ -204,13 +208,11 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 
 				delete [] writeData;
 
-				result = static_cast<uint32_t>(request->dataSize);
-				responsePtr = request->responsePtr;
+				sendNewConsoleAPIResponse(request->responsePtr, request->dataSize);
 			}
 			else if(requestData.requestCode == 0x1000005) //ReadConsole
 			{
 				NewReadConsoleRequestData *request = reinterpret_cast<NewReadConsoleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
-				noresult = true;
 
 				struct ReadConsoleData
 				{
@@ -225,27 +227,14 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 					ReadConsoleData *readData = reinterpret_cast<ReadConsoleData *>(userData);
 
 					WriteProcessMemory(childProcess_, readData->dataPtr, buffer, bufferSize, nullptr);
-					WriteProcessMemory(childProcess_, readData->responsePtr, &nChar, sizeof(uint32_t), nullptr);
-					connection_->sendPacket(HandleDeviceIoControlFile);
+					sendNewConsoleAPIResponse(readData->responsePtr, static_cast<uint32_t>(nChar));
 
 					delete readData;
 				}
-				, (requestData.data > 0), userData);
+				, ((requestData.data && 0xff) == 1), userData);
 			}
 			else
 				__nop();
-
-			if(!noresult)
-			{
-				if(!responsePtr)
-				{
-					NewConsoleCallServerGenericData *request = reinterpret_cast<NewConsoleCallServerGenericData *>(inputBuf + sizeof(NewConsoleCallServerData));
-					responsePtr = request->responsePtr;
-				}
-
-				WriteProcessMemory(childProcess_, responsePtr, &result, sizeof(uint32_t), nullptr);
-				connection_->sendPacket(HandleDeviceIoControlFile);
-			}
 		}
 		else
 			__debugbreak();

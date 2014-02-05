@@ -7,10 +7,10 @@
 struct NewConsoleCallServerData
 {
 	void *requestHandle;
-	uint32_t unk1;
-	uint32_t unk2;
-	uint32_t unk3;
-	uint32_t unk4;
+	uint32_t data1;
+	uint32_t data2;
+	uint32_t data3;
+	uint32_t data4;
 	void *requestDataPtr;
 };
 
@@ -26,6 +26,7 @@ struct NewConsoleCallServerRequestData
 	uint32_t requestCode;
 	uint32_t unk;
 	uint32_t data;
+	uint32_t data1;
 };
 struct NewWriteConsoleRequestData
 {

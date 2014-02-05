@@ -32,6 +32,12 @@ private:
 	void handleWrite(uint8_t *buffer, size_t bufferSize);
 	bool isInputHandle(void *handle);
 	bool isOutputHandle(void *handle);
+	void sendNewConsoleAPIResponse(void *responsePtr, void *buffer, size_t bufferSize);
+	template<typename T>
+	void sendNewConsoleAPIResponse(void *responsePtr, T data)
+	{
+		return sendNewConsoleAPIResponse(responsePtr, &data, sizeof(T));
+	}
 public:
 	ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener);
 	~ConsoleHost();
