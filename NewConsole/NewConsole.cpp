@@ -37,7 +37,7 @@ int NewConsole::run(int nShowCmd)
 
 	ShowWindow(mainWnd_, nShowCmd);
 
-	consoles_.push_back(std::make_shared<ConsoleWnd>(L"C:\\Users\\dlunch\\Documents\\Visual Studio 2013\\Projects\\test\\x64\\Debug\\test.exe", shared_from_this()));
+	consoles_.push_back(std::make_shared<ConsoleWnd>(L"C:\\windows\\system32\\cmd.exe", shared_from_this()));
 	activeConsole_ = *consoles_.begin();
 
 	MSG msg;
