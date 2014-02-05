@@ -130,7 +130,7 @@ void *openPipe(TargetData *targetData)
 
 bool isFakeHandle(void *handle)
 {
-	return (reinterpret_cast<size_t>(handle) & 0xeeff0000) == 0xeeff0000;
+	return (reinterpret_cast<size_t>(handle) & 0xffff0000) == 0xeeff0000;
 }
 
 void sendPacketData(TargetData *targetData, void *data, size_t size)
