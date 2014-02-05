@@ -167,15 +167,18 @@ void ConsoleHostConnection::readPacketHeader()
 	readPipe(reinterpret_cast<uint8_t *>(header_), sizeof(PacketHeader), ReadHeader);
 }
 
-void ConsoleHostConnection::sendPacket_(uint32_t op, const uint8_t *data, size_t size)
+void ConsoleHostConnection::sendPacketHeader(uint16_t op, uint32_t size)
 {
 	PacketHeader header;
 	header.op = op;
-	header.length = static_cast<uint32_t>(size);
+	header.length = size;
 
 	writePipe(reinterpret_cast<uint8_t *>(&header), sizeof(PacketHeader));
-	if(size)
-		writePipe(data, size);
+}
+
+void ConsoleHostConnection::sendPacketData(const uint8_t *data, size_t size)
+{
+	writePipe(data, size);
 }
 
 void ConsoleHostConnection::headerReceived(IOOperation *op)

@@ -38,6 +38,12 @@ private:
 	{
 		return sendNewConsoleAPIResponse(responsePtr, &data, sizeof(T));
 	}
+	void sendCSRSSConsoleAPIResponse(void *buffer, size_t bufferSize);
+	template<typename T>
+	void sendCSRSSConsoleAPIResponse(T *data)
+	{
+		return sendCSRSSConsoleAPIResponse(data, sizeof(T));
+	}
 public:
 	ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener);
 	~ConsoleHost();

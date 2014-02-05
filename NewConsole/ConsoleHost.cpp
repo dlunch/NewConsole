@@ -9,10 +9,25 @@
 #include "ConsoleEventListener.h"
 #include "ConsoleInternal.h"
 
+//OpenConsole, GetConsoleMode, SetConsoleMode, ReadConsole, WriteConsole, GetConsoleTitle, GetConsoleScreenBufferInfo, GetConsoleLangId, VerifyConsoleIoHandle, GetConsoleCP
+const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0x68, 0x4c, 0x23, 0x3c};
+const uint16_t *g_csrssAPITable;
+
 ConsoleHost::ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0)
 {
 	try
 	{
+		if(!g_csrssAPITable)
+		{
+#ifdef _WIN64
+			PEB64 *peb = reinterpret_cast<PEB64 *>(__readgsqword(0x60));
+#elif defined(_WIN32)
+			PEB32 *peb = reinterpret_cast<PEB32 *>(__readfsdword(0x30));
+#endif
+			if(peb->OSMajorVersion == 6 && peb->OSMinorVersion == 1)
+				g_csrssAPITable = g_csrssAPITableWin7;
+		}
+
 		ConsoleHostServer::registerConsoleHost(this);
 		
 		STARTUPINFO si;
@@ -57,7 +72,16 @@ ConsoleHost::~ConsoleHost()
 void ConsoleHost::sendNewConsoleAPIResponse(void *responsePtr, void *buffer, size_t bufferSize)
 {
 	WriteProcessMemory(childProcess_, responsePtr, buffer, bufferSize, nullptr);
-	connection_->sendPacket(HandleDeviceIoControlFile);
+	connection_->sendPacketHeader(HandleDeviceIoControlFile, 0);
+}
+
+void ConsoleHost::sendCSRSSConsoleAPIResponse(void *buffer, size_t bufferSize)
+{
+	HandleLPCMessageResponse response;
+	response.callOriginal = false;
+	connection_->sendPacketHeader(HandleLPCMessage, static_cast<uint32_t>(bufferSize + sizeof(HandleLPCMessageResponse)));
+	connection_->sendPacketData(&response);
+	connection_->sendPacketData(reinterpret_cast<const uint8_t *>(buffer), bufferSize);
 }
 
 void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
@@ -130,7 +154,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			//inputBuf is RTL_USER_PROCESS_PARAMETERS, but we don't use that.
 			
 			//no output
-			connection_->sendPacket(HandleDeviceIoControlFile);
+			connection_->sendPacketHeader(HandleDeviceIoControlFile, 0);
 		}
 		else if(request->code == 0x500023) //Win8.1: Called in ConsoleCommitState
 		{
@@ -228,15 +252,64 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 
 		ConsoleHostServer::patchProcess(request->processHandle);
 		
-		connection_->sendPacket(HandleCreateUserProcess);
+		connection_->sendPacketHeader(HandleCreateUserProcess, 0);
 	}
 	else if(op == HandleLPCMessage)
 	{
 		ConsoleLPCMessageHeader *messageHeader = reinterpret_cast<ConsoleLPCMessageHeader *>(data);
 
-		HandleLPCMessageResponse response;
-		response.callOriginal = true;
-		connection_->sendPacket(HandleLPCMessage, &response);
+		if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiOpenConsole])	//kernel32 initialize always tries to openconsole first.
+		{																				//calling original will fail(no existing console), so our console will work.
+			HandleLPCMessageResponse response;
+			response.callOriginal = true;
+			connection_->sendPacket(HandleLPCMessage, &response);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleMode])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleMode])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiReadConsole])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleTitle])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleScreenBufferInfo])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleLangId])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiVerifyConsoleIoHandle])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleCP])
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else if(messageHeader->ApiNumber == 0x53) //only in windows 7. ConsoleClientConnect
+		{
+			sendCSRSSConsoleAPIResponse(messageHeader, size);
+		}
+		else
+		{
+			HandleLPCMessageResponse response;
+			response.callOriginal = true;
+			connection_->sendPacket(HandleLPCMessage, &response);
+		}
 	}
 	else if(op == HandleDuplicateObject)
 	{

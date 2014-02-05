@@ -79,3 +79,17 @@ struct ConsoleLPCMessageHeader
 };
 
 #pragma pack(pop)
+
+enum CSRSSAPI
+{
+	CSRSSApiOpenConsole,
+	CSRSSApiGetConsoleMode,
+	CSRSSApiSetConsoleMode,
+	CSRSSApiReadConsole,
+	CSRSSApiWriteConsole,
+	CSRSSApiGetConsoleTitle,
+	CSRSSApiGetConsoleScreenBufferInfo,
+	CSRSSApiGetConsoleLangId,
+	CSRSSApiVerifyConsoleIoHandle,
+	CSRSSApiGetConsoleCP,
+};

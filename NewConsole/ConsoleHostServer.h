@@ -17,8 +17,7 @@ private:
 	PacketHeader *header_;
 	uint8_t *buf_;
 	size_t totalReceived_;
-	
-	void sendPacket_(uint32_t op, const uint8_t *data, size_t size);
+
 	void readPacketHeader();
 
 	void writePipe(const uint8_t *data, size_t size);
@@ -31,18 +30,24 @@ public:
 	ConsoleHostConnection(void *pipe);
 	~ConsoleHostConnection();
 
+	void sendPacketHeader(uint16_t op, uint32_t size);
+	void sendPacketData(const uint8_t *data, size_t size);
+
 	template<typename T>
-	void sendPacket(uint32_t op, T *data)
+	void sendPacket(uint16_t op, const T *data)
 	{
-		return sendPacket_( op, reinterpret_cast<uint8_t *>(data), sizeof(T));
+		sendPacketHeader(op, sizeof(T));
+		sendPacketData(reinterpret_cast<const uint8_t *>(data), sizeof(T));
 	}
-	void sendPacket(uint32_t op)
+	void sendPacketWithData(uint16_t op, const uint8_t *data, size_t size)
 	{
-		return sendPacket_(op, nullptr, 0);
+		sendPacketHeader(op, static_cast<uint32_t>(size));
+		sendPacketData(data, size);
 	}
-	void sendPacketWithData(uint32_t op, const uint8_t *data, size_t size)
+	template<typename T>
+	void sendPacketData(const T* data)
 	{
-		return sendPacket_(op, data, size);
+		sendPacketData(reinterpret_cast<const uint8_t *>(data), sizeof(T));
 	}
 };
 
