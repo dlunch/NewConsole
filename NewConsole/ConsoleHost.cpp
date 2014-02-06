@@ -9,8 +9,8 @@
 #include "ConsoleEventListener.h"
 #include "ConsoleInternal.h"
 
-//OpenConsole, GetConsoleMode, SetConsoleMode, ReadConsole, WriteConsole, GetConsoleTitle, GetConsoleScreenBufferInfo, GetConsoleLangId, VerifyConsoleIoHandle, GetConsoleCP
-const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0xb, 0x4c, 0x23, 0x3c};
+//OpenConsole, GetConsoleMode, SetConsoleMode, ReadConsole, WriteConsole, GetConsoleTitle, GetConsoleScreenBufferInfo, GetConsoleLangId, VerifyConsoleIoHandle, GetConsoleCP, SetConsoleTitle
+const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0xb, 0x4c, 0x23, 0x3c, 0x25};
 const uint16_t *g_csrssAPITable;
 
 ConsoleHost::ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0)
@@ -385,6 +385,11 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		{
 			CSRSSGetSetCPData *rdata = reinterpret_cast<CSRSSGetSetCPData *>(dataPtr);
 			rdata->codepage = CP_UTF8;
+			messageHeader->Status = 0;
+			sendCSRSSConsoleAPIResponse(messageHeader);
+		}
+		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleTitle])
+		{
 			messageHeader->Status = 0;
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}

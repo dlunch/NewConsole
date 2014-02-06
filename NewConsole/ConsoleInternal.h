@@ -90,6 +90,7 @@ enum CSRSSAPI
 	CSRSSApiGetConsoleLangId,
 	CSRSSApiVerifyConsoleIoHandle,
 	CSRSSApiGetConsoleCP,
+	CSRSSApiSetConsoleTitle,
 };
 
 struct CSRSSGetSetConsoleModeData
