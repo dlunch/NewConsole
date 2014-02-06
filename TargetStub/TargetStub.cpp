@@ -250,7 +250,7 @@ uint32_t __stdcall HookedNtReadFile(TargetData *targetData, void *FileHandle, vo
 	if(IoStatusBlock && Length && Buffer && isFakeHandle(FileHandle))
 	{
 		HandleReadFileRequest request;
-		request.readSize = static_cast<uint32_t>(Length);
+		request.sizeToRead = static_cast<uint32_t>(Length);
 		sendPacket(targetData, HandleReadFile, &request);
 
 		size_t length;

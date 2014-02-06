@@ -15,6 +15,7 @@ typedef int32_t ssize_t;
 class ConsoleEventListener;
 class ConsoleHostConnection;
 struct ConsoleLPCMessageHeader;
+struct GetConsoleScreenBufferInfoExResponse;
 class ConsoleHost
 {
 	friend class ConsoleHostServer;
@@ -36,13 +37,14 @@ private:
 
 	void *newFakeHandle();
 	void cleanup();
-	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWidechar, void *userData);
+	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWideChar, void *userData);
 	void checkQueuedRead();
-	void handleWrite(uint8_t *buffer, size_t bufferSize, bool unicode);
+	void handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideChar);
 	bool isInputHandle(void *handle);
 	bool isOutputHandle(void *handle);
 	void setConsoleMode(void *handle, uint32_t mode);
 	uint32_t getConsoleMode(void *handle);
+	void getConsoleScreenBufferInfo(GetConsoleScreenBufferInfoExResponse *response);
 
 	void sendNewConsoleAPIResponse(void *responsePtr, void *buffer, size_t bufferSize);
 	template<typename T>

@@ -49,12 +49,12 @@ struct NewReadConsoleRequestData
 	uint32_t unk5;
 	uint32_t unk6;
 	void *responsePtr;
-	uint32_t readSize;
+	uint32_t sizeToRead;
 	uint32_t unk7;
 	void *dataPtr;
 };
 
-struct NewGetConsoleScreenBufferInfoExResponse
+struct GetConsoleScreenBufferInfoExResponse
 {
 	COORD size;					//+0
 	COORD cursorPos;			//+4
@@ -118,7 +118,7 @@ struct CSRSSWriteConsoleData
 	size_t dataSize;
 	size_t unk;
 	uint8_t isEmbedded;
-	uint8_t isUnicode;
+	uint8_t isWideChar;
 };
 
 #pragma pack(push, 1)
@@ -128,12 +128,12 @@ struct CSRSSReadConsoleData
 	uint16_t exeNameSize;
 	uint8_t data[0x56];
 	void *dataPtr;
-	uint32_t sizeToRead;
 	uint32_t sizeRead;
+	uint32_t sizeToRead;
 	uint32_t unk1;
 	uint32_t unk2;
 	uint32_t unk3;
-	uint8_t isUnicode;
+	uint8_t isWideChar;
 };
 #pragma pack(pop)
 
@@ -149,6 +149,12 @@ struct CSRSSConsoleClientConnectData
 	size_t unk4;			//56	//28
 	uint32_t unk5;			//64	//32
 	uint32_t flag;			//68	//36
+};
+
+struct CSRSSGetConsoleScreenBufferInfoExResponse
+{
+	void *handle;
+	GetConsoleScreenBufferInfoExResponse data;
 };
 
 #pragma pack(pop)

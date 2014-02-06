@@ -45,7 +45,7 @@ struct HandleCreateFileResponse
 
 struct HandleReadFileRequest
 {
-	uint32_t readSize;
+	uint32_t sizeToRead;
 };
 
 struct HandleWriteFileResponse

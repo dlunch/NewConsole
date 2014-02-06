@@ -86,6 +86,8 @@ void ConsoleHost::sendCSRSSConsoleAPIResponse(ConsoleLPCMessageHeader *messageHe
 
 std::vector<uint8_t> ConsoleHost::readCSRSSCaptureData(ConsoleLPCMessageHeader *messageHeader)
 {
+	if(!messageHeader->CsrCaptureData)
+		return std::vector<uint8_t>();
 	void *ptr = reinterpret_cast<void *>(messageHeader->CsrCaptureData + csrssMemoryDiff_);
 	CSR_CAPTURE_BUFFER captureBuffer;
 	ReadProcessMemory(childProcess_, ptr, &captureBuffer, sizeof(captureBuffer), nullptr);
@@ -160,7 +162,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	{
 		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
 
-		queueReadOperation(request->readSize, 
+		queueReadOperation(request->sizeToRead, 
 						   std::bind(&ConsoleHostConnection::sendPacketWithData, connection_, HandleReadFile, std::placeholders::_1, std::placeholders::_2), 
 						   false, nullptr);
 	}
@@ -221,10 +223,8 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				sendNewConsoleAPIResponse(genericRequest->responsePtr, 0);
 			else if(requestData.requestCode == 0x2000007) //GetConsoleScreenBufferInfoEx
 			{
-				NewGetConsoleScreenBufferInfoExResponse response;
-				ZeroMemory(&response, sizeof(response));
-				response.size.X = 80;
-				response.size.Y = 24;
+				GetConsoleScreenBufferInfoExResponse response;
+				getConsoleScreenBufferInfo(&response);
 				sendNewConsoleAPIResponse(genericRequest->responsePtr, &response, sizeof(response));
 			}
 			else if(requestData.requestCode == 0x1000006) //WriteConsole
@@ -252,7 +252,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				userData->responsePtr = request->responsePtr;
 				userData->dataPtr = request->dataPtr;
 
-				queueReadOperation(request->readSize, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
+				queueReadOperation(request->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
 					ReadConsoleData *readData = reinterpret_cast<ReadConsoleData *>(userData);
 
 					WriteProcessMemory(childProcess_, readData->dataPtr, buffer, bufferSize, nullptr);
@@ -303,12 +303,53 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiReadConsole])
 		{
-			CSRSSReadConsoleData *data = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
-			sendCSRSSConsoleAPIResponse(messageHeader);
+			struct CSRSSReadLambdaData
+			{
+				std::vector<uint8_t> messageBuf;
+				std::vector<uint8_t> captureBuffer;
+				void *requestPointer;
+			};
+			CSRSSReadLambdaData *userData = new CSRSSReadLambdaData;
+			userData->messageBuf.assign(data, data + size);
+			userData->captureBuffer = readCSRSSCaptureData(messageHeader);
+			userData->requestPointer = request->requestPointer;
+
+			CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
+
+			queueReadOperation(readData->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
+				CSRSSReadLambdaData *readLambdaData = reinterpret_cast<CSRSSReadLambdaData *>(userData);
+				uint8_t *data = &readLambdaData->messageBuf[0];
+				ConsoleLPCMessageHeader *messageHeader = reinterpret_cast<ConsoleLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
+				uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(ConsoleLPCMessageHeader);
+				CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
+
+				if(messageHeader->CsrCaptureData)
+				{
+					uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(messageHeader, readLambdaData->requestPointer, readLambdaData->captureBuffer, 0));
+					memcpy(data, buffer, bufferSize);
+				}
+				else
+					memcpy(readData->data, buffer, bufferSize);
+				readData->sizeRead = static_cast<uint32_t>(bufferSize);
+
+				messageHeader->Status = 0;
+				sendCSRSSConsoleAPIResponse(messageHeader);
+
+				delete readLambdaData;
+			}, readData->isWideChar == 1, userData);
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
 		{
-			CSRSSWriteConsoleData *data = reinterpret_cast<CSRSSWriteConsoleData *>(dataPtr);
+			CSRSSWriteConsoleData *writeData = reinterpret_cast<CSRSSWriteConsoleData *>(dataPtr);
+			if(writeData->isEmbedded == 1)
+				handleWrite(writeData->data, writeData->dataSize, writeData->isWideChar == 1);
+			else
+			{
+				std::vector<uint8_t> buffer = readCSRSSCaptureData(messageHeader);
+				uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(messageHeader, request->requestPointer, buffer, 0));
+				handleWrite(data, writeData->dataSize, writeData->isWideChar == 1);
+			}
+			messageHeader->Status = 0;
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleTitle])
@@ -317,6 +358,10 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleScreenBufferInfo])
 		{
+			CSRSSGetConsoleScreenBufferInfoExResponse *data = reinterpret_cast<CSRSSGetConsoleScreenBufferInfoExResponse *>(dataPtr);
+			getConsoleScreenBufferInfo(&data->data);
+
+			messageHeader->Status = 0;
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleLangId])
@@ -335,6 +380,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		{
 			CSRSSGetSetCPData *rdata = reinterpret_cast<CSRSSGetSetCPData *>(dataPtr);
 			rdata->codepage = CP_UTF8;
+			messageHeader->Status = 0;
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}
 		else if(apiNumber == 0x53) //only in windows 7. ConsoleClientConnect
@@ -392,6 +438,13 @@ void *ConsoleHost::newFakeHandle()
 	return reinterpret_cast<void *>((0xeeff00f3 | ((lastHandleId_ ++) << 8)));
 }
 
+void ConsoleHost::getConsoleScreenBufferInfo(GetConsoleScreenBufferInfoExResponse *response)
+{
+	ZeroMemory(response, sizeof(GetConsoleScreenBufferInfoExResponse));
+	response->size.X = 80;
+	response->size.Y = 24;
+}
+
 bool ConsoleHost::isInputHandle(void *handle)
 {
 	for(auto &i : inputHandles_)
@@ -422,9 +475,9 @@ void ConsoleHost::write(const std::string &buffer)
 	checkQueuedRead();
 }
 
-void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWidechar, void *userData)
+void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWideChar, void *userData)
 {
-	queuedReadOperations_.push_back(std::make_tuple(size, completion, isWidechar, userData));
+	queuedReadOperations_.push_back(std::make_tuple(size, completion, isWideChar, userData));
 	checkQueuedRead();
 }
 
@@ -463,10 +516,10 @@ void ConsoleHost::checkQueuedRead()
 	}
 }
 
-void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool unicode)
+void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideChar)
 {
 	std::string stringBuf;
-	if(unicode)
+	if(isWideChar)
 	{
 		//input is unicode
 		int size = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(buffer), static_cast<int>(bufferSize / 2), nullptr, 0, 0, nullptr);
