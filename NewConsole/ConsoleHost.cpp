@@ -293,12 +293,16 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 		{
 			CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
 			rdata->mode = getConsoleMode(rdata->handle);
+			
+			messageHeader->Status = 0;
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleMode])
 		{
 			CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
 			setConsoleMode(rdata->handle, rdata->mode);
+
+			messageHeader->Status = 0;
 			sendCSRSSConsoleAPIResponse(messageHeader);
 		}
 		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiReadConsole])
