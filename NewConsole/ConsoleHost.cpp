@@ -331,6 +331,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 				{
 					uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(messageHeader, readLambdaData->requestPointer, readLambdaData->captureBuffer, 0));
 					memcpy(data, buffer, bufferSize);
+					writeCSRSSCaptureData(messageHeader, readLambdaData->captureBuffer);
 				}
 				else
 					memcpy(readData->data, buffer, bufferSize);
