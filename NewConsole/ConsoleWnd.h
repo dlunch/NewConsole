@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <list>
+#include <mutex>
 
 #include <Windows.h>
 #include <gdiplus.h>
@@ -23,6 +24,7 @@ private:
 	int cacheHeight_;
 
 	std::list<std::pair<std::wstring, float>> buffer_;
+	std::mutex bufferLock_;
 	std::wstring lastLine_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:

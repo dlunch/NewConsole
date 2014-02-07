@@ -4,8 +4,9 @@
 #include "NewConsole.h"
 
 ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd) : 
-	host_(new ConsoleHost(cmdline, this)), cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1)
+	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1)
 {
+	host_.reset(new ConsoleHost(cmdline, this));
 }
 
 ConsoleWnd::~ConsoleWnd()
@@ -14,6 +15,7 @@ ConsoleWnd::~ConsoleWnd()
 
 void ConsoleWnd::appendStringToBuffer(const std::wstring &buffer)
 {
+	std::lock_guard<std::mutex> guard(bufferLock_);
 	std::wstring line;
 	if(lastLine_.size())
 	{
@@ -78,6 +80,7 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	Gdiplus::StringFormat format(Gdiplus::StringFormatFlagsBypassGDI);
 	g.FillRectangle(&blackBrush, 0, 0, width, height);
 
+	std::lock_guard<std::mutex> guard(bufferLock_);
 	float currentHeight = 0;
 	decltype(buffer_)::reverse_iterator it;
 	for(it = buffer_.rbegin(); it != buffer_.rend(); ++ it)
