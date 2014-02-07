@@ -6,8 +6,9 @@
 
 #pragma comment(lib, "gdiplus.lib")
 
-NewConsole::NewConsole() : mainDC_(CreateCompatibleDC(nullptr)), mainBitmap_(nullptr)
+NewConsole::NewConsole() : mainDC_(CreateCompatibleDC(nullptr)), mainBitmap_(nullptr), redrawQueued_(false)
 {
+	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &mainThread_, 0, FALSE, DUPLICATE_SAME_ACCESS);
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	Gdiplus::GdiplusStartup(&gdiplusToken_, &gdiplusStartupInput, nullptr);
 
@@ -16,6 +17,7 @@ NewConsole::NewConsole() : mainDC_(CreateCompatibleDC(nullptr)), mainBitmap_(nul
 
 NewConsole::~NewConsole()
 {
+	CloseHandle(mainThread_);
 	Gdiplus::GdiplusShutdown(gdiplusToken_);
 
 	DeleteDC(mainDC_);
@@ -64,11 +66,18 @@ void NewConsole::contentsUpdated(std::weak_ptr<ConsoleWnd> wnd)
 		redraw();
 }
 
-void NewConsole::redraw()
+void CALLBACK NewConsole::redrawCallback_(ULONG_PTR dwParam)
+{
+	reinterpret_cast<NewConsole *>(dwParam)->redrawCallback();
+}
+
+void NewConsole::redrawCallback()
 {
 	std::shared_ptr<ConsoleWnd> activeConsole = activeConsole_.lock();
 	if(!activeConsole)
 		return;
+	redrawQueued_ = false;
+
 	RECT rt;
 	GetWindowRect(mainWnd_, &rt);
 	int width = rt.right - rt.left;
@@ -78,8 +87,8 @@ void NewConsole::redraw()
 		HDC desktopDC = GetDC(nullptr);
 		mainBitmap_ = CreateCompatibleBitmap(desktopDC, width, height);
 		ReleaseDC(nullptr, desktopDC);
+		SelectObject(mainDC_, mainBitmap_);
 	}
-	SelectObject(mainDC_, mainBitmap_);
 
 	activeConsole->drawScreenContents(mainDC_, 0, 0, width, height, 0, 0);
 
@@ -93,6 +102,18 @@ void NewConsole::redraw()
 	POINT origin = {rt.left, rt.top};
 	SIZE size = {width, height};
 	UpdateLayeredWindow(mainWnd_, mainDC_, &origin, &size, mainDC_, &pt, RGB(0, 0, 0), &bf, ULW_ALPHA);
+}
+
+void NewConsole::redraw()
+{
+	std::shared_ptr<ConsoleWnd> activeConsole = activeConsole_.lock();
+	if(!activeConsole)
+		return;
+	if(redrawQueued_)
+		return;
+
+	QueueUserAPC(&NewConsole::redrawCallback_, mainThread_, reinterpret_cast<ULONG_PTR>(this));
+	redrawQueued_ = true;
 }
 
 LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
