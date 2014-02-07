@@ -15,41 +15,36 @@ ConsoleWnd::~ConsoleWnd()
 
 void ConsoleWnd::appendStringToBuffer(const std::wstring &buffer)
 {
-	std::lock_guard<std::mutex> guard(bufferLock_);
-	std::wstring line;
-	if(lastLine_.size())
+	auto lastLine = buffer_.end();
+	if(buffer_.size() == 0)
 	{
-		line = lastLine_;
-		buffer_.pop_back();
+		std::lock_guard<std::mutex> guard(bufferLock_);
+		lastLine = buffer_.insert(buffer_.end(), std::make_pair(std::wstring(L""), 0.f));
 	}
-	size_t pos = line.size();
+	else
+		lastLine --;
+	std::wstring *line = &lastLine->first; //we need to modify last line.
+	size_t pos = line->size();
 	for(size_t i = 0; i < buffer.size(); i ++)
 	{
 		if(buffer[i] == '\n')
 		{
-			buffer_.push_back(std::make_pair(line, 0.f));
-
-			line.clear();
+			std::lock_guard<std::mutex> guard(bufferLock_);
+			auto it = buffer_.insert(buffer_.end(), std::make_pair(std::wstring(L""), 0.f));
+			line = &it->first;
 			pos = 0;
 		}
 		else if(buffer[i] == '\r')
 			pos = 0;
 		else
 		{
-			if(pos + 1 > line.size())
-				line.push_back(buffer[i]);
+			if(pos + 1 > line->size())
+				line->push_back(buffer[i]);
 			else
-				line[pos] = buffer[i];
+				(*line)[pos] = buffer[i];
 			pos ++;
 		}
 	}
-	if(line.size())
-	{
-		buffer_.push_back(std::make_pair(line, 0.f));
-		lastLine_ = line;
-	}
-	else
-		lastLine_.clear();
 	bufferUpdated();
 }
 
@@ -80,33 +75,38 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	Gdiplus::StringFormat format(Gdiplus::StringFormatFlagsBypassGDI);
 	g.FillRectangle(&blackBrush, 0, 0, width, height);
 
-	std::lock_guard<std::mutex> guard(bufferLock_);
 	float currentHeight = 0;
-	decltype(buffer_)::reverse_iterator it;
-	for(it = buffer_.rbegin(); it != buffer_.rend(); ++ it)
+	decltype(buffer_)::reverse_iterator it, begin, end;
 	{
-		if(it->second == 0.f)
+		std::lock_guard<std::mutex> guard(bufferLock_);
+
+		begin = buffer_.rbegin();
+		end = buffer_.rend();
+		for(it = begin; it != end; ++ it)
 		{
-			std::wstring string = it->first;
-			if(string.size() == 0) //empty line
-				string = L"\r\n";
-			Gdiplus::RectF bound;
-			g.MeasureString(string.c_str(), static_cast<int>(string.size()), &font, screen, &format, &bound);
-			it->second = bound.Height;
+			if(it->second == 0.f)
+			{
+				std::wstring string = it->first;
+				if(string.size() == 0) //empty line
+					string = L"\r\n";
+				Gdiplus::RectF bound;
+				g.MeasureString(string.c_str(), static_cast<int>(string.size()), &font, screen, &format, &bound);
+				it->second = bound.Height;
+			}
+			currentHeight += it->second;
+
+			if(currentHeight > screen.Height)
+				break;
 		}
-		currentHeight += it->second;
+		while(true)
+		{
+			-- it;
+			g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font, screen, &format, &whiteBrush);
+			screen.Y += it->second;
 
-		if(currentHeight > screen.Height)
-			break;
-	}
-	while(true)
-	{
-		-- it;
-		g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font, screen, &format, &whiteBrush);
-		screen.Y += it->second;
-
-		if(it == buffer_.rbegin())
-			break;
+			if(it == begin)
+				break;
+		}
 	}
 }
 

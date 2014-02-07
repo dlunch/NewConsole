@@ -25,7 +25,6 @@ private:
 
 	std::list<std::pair<std::wstring, float>> buffer_;
 	std::mutex bufferLock_;
-	std::wstring lastLine_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
 	virtual void handleWrite(const std::string &buffer);
