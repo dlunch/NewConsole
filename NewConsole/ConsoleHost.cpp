@@ -279,142 +279,150 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	else if(op == HandleLPCMessage)
 	{
 		HandleLPCMessageRequest *request = reinterpret_cast<HandleLPCMessageRequest *>(data);
-		CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
-		uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(CSRSSLPCMessageHeader);
 
-		uint32_t apiNumber = messageHeader->ApiNumber & 0xffffffff;
-		if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiOpenConsole])	//kernel32 initialize always tries to openconsole first.
-		{																				//calling original will fail(no existing console), so our console will work.
-			HandleLPCMessageResponse response;
-			response.callOriginal = true;
-			connection_->sendPacket(HandleLPCMessage, &response);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleMode])
+		bool sent = false;
+		if(g_csrssAPITable)
 		{
-			CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
-			rdata->mode = getConsoleMode(rdata->handle);
-			
-			messageHeader->Status = 0;
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleMode])
-		{
-			CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
-			setConsoleMode(rdata->handle, rdata->mode);
+			sent = true;
 
-			messageHeader->Status = 0;
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiReadConsole])
-		{
-			struct CSRSSReadLambdaData
+			CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
+			uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest)+ sizeof(CSRSSLPCMessageHeader);
+			uint32_t apiNumber = messageHeader->ApiNumber & 0xffffffff;
+			if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiOpenConsole])	//kernel32 initialize always tries to openconsole first.
+			{																//calling original will fail(no existing console), so our console will work.
+				HandleLPCMessageResponse response;
+				response.callOriginal = true;
+				connection_->sendPacket(HandleLPCMessage, &response);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleMode])
 			{
-				std::vector<uint8_t> messageBuf;
-				std::vector<uint8_t> captureBuffer;
-				void *requestPointer;
-			};
-			CSRSSReadLambdaData *userData = new CSRSSReadLambdaData;
-			userData->messageBuf.assign(data, data + size);
-			userData->captureBuffer = readCSRSSCaptureData(messageHeader);
-			userData->requestPointer = request->requestPointer;
-
-			CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
-
-			queueReadOperation(readData->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
-				CSRSSReadLambdaData *readLambdaData = reinterpret_cast<CSRSSReadLambdaData *>(userData);
-				uint8_t *data = &readLambdaData->messageBuf[0];
-				CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
-				uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(CSRSSLPCMessageHeader);
-				CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
-
-				if(messageHeader->CsrCaptureData)
-				{
-					uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(messageHeader, readLambdaData->requestPointer, readLambdaData->captureBuffer, 0));
-					memcpy(data, buffer, bufferSize);
-					writeCSRSSCaptureData(messageHeader, readLambdaData->captureBuffer);
-				}
-				else
-					memcpy(readData->data, buffer, bufferSize);
-				readData->sizeRead = static_cast<uint32_t>(bufferSize);
+				CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
+				rdata->mode = getConsoleMode(rdata->handle);
+			
+				messageHeader->Status = 0;
+				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleMode])
+			{
+				CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
+				setConsoleMode(rdata->handle, rdata->mode);
 
 				messageHeader->Status = 0;
 				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiReadConsole])
+			{
+				struct CSRSSReadLambdaData
+				{
+					std::vector<uint8_t> messageBuf;
+					std::vector<uint8_t> captureBuffer;
+					void *requestPointer;
+				};
+				CSRSSReadLambdaData *userData = new CSRSSReadLambdaData;
+				userData->messageBuf.assign(data, data + size);
+				userData->captureBuffer = readCSRSSCaptureData(messageHeader);
+				userData->requestPointer = request->requestPointer;
 
-				delete readLambdaData;
-			}, readData->isWideChar == 1, userData);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
-		{
-			CSRSSWriteConsoleData *writeData = reinterpret_cast<CSRSSWriteConsoleData *>(dataPtr);
-			if(writeData->isEmbedded == 1)
-				handleWrite(writeData->data, writeData->dataSize, writeData->isWideChar == 1);
-			else
+				CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
+
+				queueReadOperation(readData->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
+					CSRSSReadLambdaData *readLambdaData = reinterpret_cast<CSRSSReadLambdaData *>(userData);
+					uint8_t *data = &readLambdaData->messageBuf[0];
+					CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
+					uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(CSRSSLPCMessageHeader);
+					CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
+
+					if(messageHeader->CsrCaptureData)
+					{
+						uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(messageHeader, readLambdaData->requestPointer, readLambdaData->captureBuffer, 0));
+						memcpy(data, buffer, bufferSize);
+						writeCSRSSCaptureData(messageHeader, readLambdaData->captureBuffer);
+					}
+					else
+						memcpy(readData->data, buffer, bufferSize);
+					readData->sizeRead = static_cast<uint32_t>(bufferSize);
+
+					messageHeader->Status = 0;
+					sendCSRSSConsoleAPIResponse(messageHeader);
+
+					delete readLambdaData;
+				}, readData->isWideChar == 1, userData);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
+			{
+				CSRSSWriteConsoleData *writeData = reinterpret_cast<CSRSSWriteConsoleData *>(dataPtr);
+				if(writeData->isEmbedded == 1)
+					handleWrite(writeData->data, writeData->dataSize, writeData->isWideChar == 1);
+				else
+				{
+					std::vector<uint8_t> buffer = readCSRSSCaptureData(messageHeader);
+					uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(messageHeader, request->requestPointer, buffer, 0));
+					handleWrite(data, writeData->dataSize, writeData->isWideChar == 1);
+				}
+				messageHeader->Status = 0;
+				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleTitle])
+			{
+				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleScreenBufferInfo])
+			{
+				CSRSSGetConsoleScreenBufferInfoExResponse *data = reinterpret_cast<CSRSSGetConsoleScreenBufferInfoExResponse *>(dataPtr);
+				getConsoleScreenBufferInfo(&data->data);
+
+				messageHeader->Status = 0;
+				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleLangId])
+			{
+				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiVerifyConsoleIoHandle])
+			{
+				CSRSSVerifyConsoleIoHandleData *data = reinterpret_cast<CSRSSVerifyConsoleIoHandleData *>(dataPtr);
+
+				data->result = 1;
+				messageHeader->Status = 0;
+				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleCP])
+			{
+				CSRSSGetSetCPData *rdata = reinterpret_cast<CSRSSGetSetCPData *>(dataPtr);
+				rdata->codepage = CP_UTF8;
+				messageHeader->Status = 0;
+				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleTitle])
+			{
+				messageHeader->Status = 0;
+				sendCSRSSConsoleAPIResponse(messageHeader);
+			}
+			else if(apiNumber == 0x53) //only in windows 7. ConsoleClientConnect
 			{
 				std::vector<uint8_t> buffer = readCSRSSCaptureData(messageHeader);
-				uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(messageHeader, request->requestPointer, buffer, 0));
-				handleWrite(data, writeData->dataSize, writeData->isWideChar == 1);
+
+				CSRSSConsoleClientConnectData *connectData = reinterpret_cast<CSRSSConsoleClientConnectData *>(
+					getCSRSSCaptureBuffer(messageHeader, request->requestPointer, buffer, 0));
+
+				connectData->consoleHandle = newFakeHandle();
+				connectData->inputHandle = newFakeHandle();
+				connectData->outputHandle = newFakeHandle();
+				connectData->errorHandle = newFakeHandle();
+
+				serverHandles_.push_back(connectData->consoleHandle);
+				inputHandles_.push_back(connectData->inputHandle);
+				outputHandles_.push_back(connectData->outputHandle);
+				outputHandles_.push_back(connectData->errorHandle);
+
+				messageHeader->Status = 0;
+				writeCSRSSCaptureData(messageHeader, buffer);
+				sendCSRSSConsoleAPIResponse(messageHeader);
 			}
-			messageHeader->Status = 0;
-			sendCSRSSConsoleAPIResponse(messageHeader);
+			else
+				sent = false;
 		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleTitle])
-		{
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleScreenBufferInfo])
-		{
-			CSRSSGetConsoleScreenBufferInfoExResponse *data = reinterpret_cast<CSRSSGetConsoleScreenBufferInfoExResponse *>(dataPtr);
-			getConsoleScreenBufferInfo(&data->data);
-
-			messageHeader->Status = 0;
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleLangId])
-		{
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiVerifyConsoleIoHandle])
-		{
-			CSRSSVerifyConsoleIoHandleData *data = reinterpret_cast<CSRSSVerifyConsoleIoHandleData *>(dataPtr);
-
-			data->result = 1;
-			messageHeader->Status = 0;
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleCP])
-		{
-			CSRSSGetSetCPData *rdata = reinterpret_cast<CSRSSGetSetCPData *>(dataPtr);
-			rdata->codepage = CP_UTF8;
-			messageHeader->Status = 0;
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleTitle])
-		{
-			messageHeader->Status = 0;
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else if(apiNumber == 0x53) //only in windows 7. ConsoleClientConnect
-		{
-			std::vector<uint8_t> buffer = readCSRSSCaptureData(messageHeader);
-
-			CSRSSConsoleClientConnectData *connectData = reinterpret_cast<CSRSSConsoleClientConnectData *>(
-				getCSRSSCaptureBuffer(messageHeader, request->requestPointer, buffer, 0));
-
-			connectData->consoleHandle = newFakeHandle();
-			connectData->inputHandle = newFakeHandle();
-			connectData->outputHandle = newFakeHandle();
-			connectData->errorHandle = newFakeHandle();
-
-			serverHandles_.push_back(connectData->consoleHandle);
-			inputHandles_.push_back(connectData->inputHandle);
-			outputHandles_.push_back(connectData->outputHandle);
-			outputHandles_.push_back(connectData->errorHandle);
-
-			messageHeader->Status = 0;
-			writeCSRSSCaptureData(messageHeader, buffer);
-			sendCSRSSConsoleAPIResponse(messageHeader);
-		}
-		else
+		if(sent == false)
 		{
 			HandleLPCMessageResponse response;
 			response.callOriginal = true;
