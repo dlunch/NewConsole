@@ -12,9 +12,9 @@ ConsoleWnd::~ConsoleWnd()
 {
 }
 
-void ConsoleWnd::appendStringToBuffer(const std::string &buffer)
+void ConsoleWnd::appendStringToBuffer(const std::wstring &buffer)
 {
-	std::string line;
+	std::wstring line;
 	if(lastLine_.size())
 	{
 		line = lastLine_;
@@ -25,7 +25,7 @@ void ConsoleWnd::appendStringToBuffer(const std::string &buffer)
 	{
 		if(buffer[i] == '\n')
 		{
-			buffer_.push_back(line);
+			buffer_.push_back(std::make_pair(line, 0.f));
 
 			line.clear();
 			pos = 0;
@@ -43,7 +43,7 @@ void ConsoleWnd::appendStringToBuffer(const std::string &buffer)
 	}
 	if(line.size())
 	{
-		buffer_.push_back(line);
+		buffer_.push_back(std::make_pair(line, 0.f));
 		lastLine_ = line;
 	}
 	else
@@ -53,7 +53,12 @@ void ConsoleWnd::appendStringToBuffer(const std::string &buffer)
 
 void ConsoleWnd::handleWrite(const std::string &buffer)
 {
-	appendStringToBuffer(buffer);
+	std::wstring wideBuffer;
+	int len = MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0);
+	wideBuffer.resize(len - 1);
+	MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, &wideBuffer[0], len);
+
+	appendStringToBuffer(wideBuffer);
 }
 
 void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
@@ -69,29 +74,36 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	Gdiplus::Font font(L"Consolas", 10);
 	Gdiplus::SolidBrush blackBrush(Gdiplus::Color::Black);
 	Gdiplus::SolidBrush whiteBrush(Gdiplus::Color::White);
-	Gdiplus::RectF rect(0.f, 0.f, static_cast<float>(width), static_cast<float>(height));
+	Gdiplus::RectF screen(0.f, 0.f, static_cast<float>(width), static_cast<float>(height));
 	Gdiplus::StringFormat format(Gdiplus::StringFormatFlagsBypassGDI);
 	g.FillRectangle(&blackBrush, 0, 0, width, height);
 
-	auto it = buffer_.begin();
-	int lines = min(static_cast<int>(height / font.GetHeight(&g)), static_cast<int>(buffer_.size()));
-	for(int c = lines - 1; c >= 0; c --)
+	float currentHeight = 0;
+	decltype(buffer_)::reverse_iterator it;
+	for(it = buffer_.rbegin(); it != buffer_.rend(); ++ it)
 	{
-		wchar_t *buf;
-		int len;
+		if(it->second == 0.f)
+		{
+			std::wstring string = it->first;
+			if(string.size() == 0) //empty line
+				string = L"\r\n";
+			Gdiplus::RectF bound;
+			g.MeasureString(string.c_str(), static_cast<int>(string.size()), &font, screen, &format, &bound);
+			it->second = bound.Height;
+		}
+		currentHeight += it->second;
 
-		len = MultiByteToWideChar(CP_UTF8, 0, it->c_str(), -1, nullptr, 0);
-		buf = new wchar_t[len + 1];
-		MultiByteToWideChar(CP_UTF8, 0, it->c_str(), -1, buf, len);
-		buf[len] = 0;
+		if(currentHeight > screen.Height)
+			break;
+	}
+	while(true)
+	{
+		-- it;
+		g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font, screen, &format, &whiteBrush);
+		screen.Y += it->second;
 
-		Gdiplus::RectF bound;
-		g.MeasureString(buf, len, &font, rect, &format, &bound);
-		g.DrawString(buf, len, &font, rect, &format, &whiteBrush);
-		rect.Y += bound.Height;
-
-		delete [] buf;
-		it ++;
+		if(it == buffer_.rbegin())
+			break;
 	}
 }
 
@@ -104,15 +116,21 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 	g.DrawImage(cacheBitmap_.get(), x, y);
 }
 
-void ConsoleWnd::appendInputBuffer(const std::string &buffer)
+void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 {
-	std::string buffer_(buffer);
-	if(buffer_[buffer_.size() - 1] == '\n')
+	std::string utf8Buffer;
+	int len = WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0, 0, nullptr);
+	utf8Buffer.resize(len - 1);
+	WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, &utf8Buffer[0], len, 0, nullptr);
+
+	size_t pos = utf8Buffer.find('\n');
+	while(pos != std::string::npos)
 	{
-		buffer_.pop_back();
-		buffer_ += "\r\n";
+		if(!(pos > 0 && utf8Buffer[pos - 1] == '\r'))
+			utf8Buffer.insert(pos, "\r");
+		pos = utf8Buffer.find('\n', pos + 2);
 	}
-	host_->write(buffer_);
+	host_->write(utf8Buffer);
 }
 
 void ConsoleWnd::bufferUpdated()

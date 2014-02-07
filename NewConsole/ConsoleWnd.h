@@ -22,19 +22,19 @@ private:
 	int cacheWidth_;
 	int cacheHeight_;
 
-	std::list<std::string> buffer_;
-	std::string lastLine_;
+	std::list<std::pair<std::wstring, float>> buffer_;
+	std::wstring lastLine_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
 	virtual void handleWrite(const std::string &buffer);
 	void updateCache(int width, int height, int scrollx, int scrolly);
 	void invalidateCache();
 	void bufferUpdated();
-	void appendStringToBuffer(const std::string &buffer);
+	void appendStringToBuffer(const std::wstring &buffer);
 public:
 	ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd);
 	~ConsoleWnd();
 
 	void drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly);
-	void appendInputBuffer(const std::string &buffer);
+	void appendInputBuffer(const std::wstring &buffer);
 };

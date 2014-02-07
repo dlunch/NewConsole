@@ -113,7 +113,7 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 			char data = static_cast<char>(wParam);
 			if(data == '\r')
 				data = '\n';
-			activeConsole_.lock()->appendInputBuffer(std::string(1, data));
+			activeConsole_.lock()->appendInputBuffer(std::wstring(1, data));
 		}
 		return 0;
 	}
