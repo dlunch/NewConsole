@@ -14,7 +14,7 @@ typedef int32_t ssize_t;
 
 class ConsoleEventListener;
 class ConsoleHostConnection;
-struct ConsoleLPCMessageHeader;
+struct CSRSSLPCMessageHeader;
 struct GetConsoleScreenBufferInfoExResponse;
 class ConsoleHost
 {
@@ -52,10 +52,10 @@ private:
 	{
 		return sendNewConsoleAPIResponse(responsePtr, &data, sizeof(T));
 	}
-	void sendCSRSSConsoleAPIResponse(ConsoleLPCMessageHeader *messageHeader);
-	std::vector<uint8_t> readCSRSSCaptureData(ConsoleLPCMessageHeader *messageHeader);
-	void writeCSRSSCaptureData(ConsoleLPCMessageHeader *messageHeader, const std::vector<uint8_t> &buffer);
-	void *getCSRSSCaptureBuffer(ConsoleLPCMessageHeader *messageHeader, void *requestPointer, const std::vector<uint8_t> &buffer, int n);
+	void sendCSRSSConsoleAPIResponse(CSRSSLPCMessageHeader *messageHeader);
+	std::vector<uint8_t> readCSRSSCaptureData(CSRSSLPCMessageHeader *messageHeader);
+	void writeCSRSSCaptureData(CSRSSLPCMessageHeader *messageHeader, const std::vector<uint8_t> &buffer);
+	void *getCSRSSCaptureBuffer(CSRSSLPCMessageHeader *messageHeader, void *requestPointer, const std::vector<uint8_t> &buffer, int n);
 public:
 	ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener);
 	~ConsoleHost();

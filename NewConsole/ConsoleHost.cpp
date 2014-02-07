@@ -75,7 +75,7 @@ void ConsoleHost::sendNewConsoleAPIResponse(void *responsePtr, void *buffer, siz
 	connection_->sendPacketHeader(HandleDeviceIoControlFile, 0);
 }
 
-void ConsoleHost::sendCSRSSConsoleAPIResponse(ConsoleLPCMessageHeader *messageHeader)
+void ConsoleHost::sendCSRSSConsoleAPIResponse(CSRSSLPCMessageHeader *messageHeader)
 {
 	HandleLPCMessageResponse response;
 	response.callOriginal = false;
@@ -84,7 +84,7 @@ void ConsoleHost::sendCSRSSConsoleAPIResponse(ConsoleLPCMessageHeader *messageHe
 	connection_->sendPacketData(reinterpret_cast<const uint8_t *>(messageHeader), messageHeader->LPCHeader.Length);
 }
 
-std::vector<uint8_t> ConsoleHost::readCSRSSCaptureData(ConsoleLPCMessageHeader *messageHeader)
+std::vector<uint8_t> ConsoleHost::readCSRSSCaptureData(CSRSSLPCMessageHeader *messageHeader)
 {
 	if(!messageHeader->CsrCaptureData)
 		return std::vector<uint8_t>();
@@ -98,14 +98,14 @@ std::vector<uint8_t> ConsoleHost::readCSRSSCaptureData(ConsoleLPCMessageHeader *
 	return result;
 }
 
-void ConsoleHost::writeCSRSSCaptureData(ConsoleLPCMessageHeader *messageHeader, const std::vector<uint8_t> &buffer)
+void ConsoleHost::writeCSRSSCaptureData(CSRSSLPCMessageHeader *messageHeader, const std::vector<uint8_t> &buffer)
 {
 	void *ptr = reinterpret_cast<void *>(messageHeader->CsrCaptureData + csrssMemoryDiff_);
 
 	WriteProcessMemory(childProcess_, ptr, &buffer[0], buffer.size(), nullptr);
 }
 
-void *ConsoleHost::getCSRSSCaptureBuffer(ConsoleLPCMessageHeader *messageHeader, void *requestPointer, const std::vector<uint8_t> &buffer, int n)
+void *ConsoleHost::getCSRSSCaptureBuffer(CSRSSLPCMessageHeader *messageHeader, void *requestPointer, const std::vector<uint8_t> &buffer, int n)
 {
 	const CSR_CAPTURE_BUFFER *csrBuffer = reinterpret_cast<const CSR_CAPTURE_BUFFER *>(&buffer[0]);
 	void *basePointer = reinterpret_cast<void *>(messageHeader->CsrCaptureData);
@@ -279,8 +279,8 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	else if(op == HandleLPCMessage)
 	{
 		HandleLPCMessageRequest *request = reinterpret_cast<HandleLPCMessageRequest *>(data);
-		ConsoleLPCMessageHeader *messageHeader = reinterpret_cast<ConsoleLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
-		uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(ConsoleLPCMessageHeader);
+		CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
+		uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(CSRSSLPCMessageHeader);
 
 		uint32_t apiNumber = messageHeader->ApiNumber & 0xffffffff;
 		if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiOpenConsole])	//kernel32 initialize always tries to openconsole first.
@@ -323,8 +323,8 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			queueReadOperation(readData->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
 				CSRSSReadLambdaData *readLambdaData = reinterpret_cast<CSRSSReadLambdaData *>(userData);
 				uint8_t *data = &readLambdaData->messageBuf[0];
-				ConsoleLPCMessageHeader *messageHeader = reinterpret_cast<ConsoleLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
-				uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(ConsoleLPCMessageHeader);
+				CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
+				uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(CSRSSLPCMessageHeader);
 				CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
 
 				if(messageHeader->CsrCaptureData)

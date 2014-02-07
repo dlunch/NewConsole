@@ -68,7 +68,7 @@ struct GetConsoleScreenBufferInfoExResponse
 	uint16_t pad2;				//+27
 	uint32_t colorTable[16];	//+28
 };
-struct ConsoleLPCMessageHeader
+struct CSRSSLPCMessageHeader
 {
 	LPC_MESSAGE LPCHeader;
 
