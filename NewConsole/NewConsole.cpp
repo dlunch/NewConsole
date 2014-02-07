@@ -17,6 +17,7 @@ NewConsole::NewConsole() : mainDC_(CreateCompatibleDC(nullptr)), mainBitmap_(nul
 
 NewConsole::~NewConsole()
 {
+	consoles_.clear();
 	CloseHandle(mainThread_);
 	Gdiplus::GdiplusShutdown(gdiplusToken_);
 
