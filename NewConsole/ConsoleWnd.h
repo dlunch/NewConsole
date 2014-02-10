@@ -23,11 +23,12 @@ private:
 	int cacheWidth_;
 	int cacheHeight_;
 
+	std::wstring inputBuffer_;
 	std::list<std::pair<std::wstring, float>> buffer_;
 	std::mutex bufferLock_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
-	virtual void handleWrite(const std::string &buffer);
+	virtual void handleWrite(const std::wstring &buffer);
 	void updateCache(int width, int height, int scrollx, int scrolly);
 	void invalidateCache();
 	void bufferUpdated();

@@ -5,5 +5,5 @@
 class ConsoleEventListener
 {
 public:
-	virtual void handleWrite(const std::string &buffer) = 0;
+	virtual void handleWrite(const std::wstring &buffer) = 0;
 };

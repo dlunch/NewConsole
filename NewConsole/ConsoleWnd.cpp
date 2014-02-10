@@ -48,14 +48,9 @@ void ConsoleWnd::appendStringToBuffer(const std::wstring &buffer)
 	bufferUpdated();
 }
 
-void ConsoleWnd::handleWrite(const std::string &buffer)
+void ConsoleWnd::handleWrite(const std::wstring &buffer)
 {
-	std::wstring wideBuffer;
-	int len = MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0);
-	wideBuffer.resize(len - 1);
-	MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, &wideBuffer[0], len);
-
-	appendStringToBuffer(wideBuffer);
+	appendStringToBuffer(buffer);
 }
 
 void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
@@ -121,19 +116,17 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 
 void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 {
-	std::string utf8Buffer;
-	int len = WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0, 0, nullptr);
-	utf8Buffer.resize(len - 1);
-	WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, &utf8Buffer[0], len, 0, nullptr);
-
-	size_t pos = utf8Buffer.find('\n');
+	std::wstring buf = buffer;
+	size_t pos = buf.find('\n');
 	while(pos != std::string::npos)
 	{
-		if(!(pos > 0 && utf8Buffer[pos - 1] == '\r'))
-			utf8Buffer.insert(pos, "\r");
-		pos = utf8Buffer.find('\n', pos + 2);
+		if(!(pos > 0 && buf[pos - 1] == L'\r'))
+			buf.insert(pos, L"\r");
+		pos = buf.find(L'\n', pos + 2);
 	}
-	host_->write(utf8Buffer);
+
+	inputBuffer_ += buf;
+	bufferUpdated();
 }
 
 void ConsoleWnd::bufferUpdated()

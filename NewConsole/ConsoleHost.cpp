@@ -484,12 +484,9 @@ void ConsoleHost::handleDisconnected()
 
 }
 
-void ConsoleHost::write(const std::string &buffer)
+void ConsoleHost::write(const std::wstring &buffer)
 {
 	inputBuffer_ += buffer;
-
-	if(inputMode_ & ENABLE_ECHO_INPUT)
-		listener_->handleWrite(buffer);
 	checkQueuedRead();
 }
 
@@ -506,21 +503,21 @@ void ConsoleHost::checkQueuedRead()
 		auto &i = queuedReadOperations_.front();
 		if(inputMode_ & ENABLE_LINE_INPUT)
 		{
-			size_t newlineOff = inputBuffer_.find("\r\n");
+			size_t newlineOff = inputBuffer_.find(L"\r\n");
 			if(newlineOff == std::string::npos)
 				break;
 			newlineOff += 2;
-			std::string buffer(inputBuffer_.begin(), inputBuffer_.begin() + newlineOff);
+			std::wstring buffer(inputBuffer_.begin(), inputBuffer_.begin() + newlineOff);
 			inputBuffer_.erase(0, newlineOff);
 
-			if(std::get<2>(i) == true)
+			if(std::get<2>(i) == false)
 			{
-				wchar_t *buf;
+				char *buf;
 				int len;
 
-				len = MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0);
-				buf = new wchar_t[len];
-				MultiByteToWideChar(CP_UTF8, 0, buffer.c_str(), -1, buf, len);
+				len = WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0, 0, 0);
+				buf = new char[len];
+				WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, buf, len, 0, 0);
 				buf[len - 1] = 0;
 
 				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), (len - 1) * 2, len - 1, std::get<3>(i));
@@ -536,13 +533,13 @@ void ConsoleHost::checkQueuedRead()
 
 void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideChar)
 {
-	std::string stringBuf;
-	if(isWideChar)
+	std::wstring stringBuf;
+	if(!isWideChar)
 	{
 		//input is unicode
-		int size = WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(buffer), static_cast<int>(bufferSize / 2), nullptr, 0, 0, nullptr);
+		int size = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize / 2), nullptr, 0);
 		stringBuf.resize(size);
-		WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(buffer), static_cast<int>(bufferSize / 2), reinterpret_cast<LPSTR>(&stringBuf[0]), size, 0, nullptr);
+		MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize / 2), reinterpret_cast<LPTSTR>(&stringBuf[0]), size);
 	}
 	else
 		stringBuf.assign(buffer, buffer + bufferSize);
