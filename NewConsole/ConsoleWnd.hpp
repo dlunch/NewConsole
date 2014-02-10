@@ -8,7 +8,7 @@
 #include <Windows.h>
 #include <gdiplus.h>
 
-#include "ConsoleEventListener.h"
+#include "ConsoleEventListener.hpp"
 
 class ConsoleHost;
 class NewConsole;

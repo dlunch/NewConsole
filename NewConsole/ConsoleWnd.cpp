@@ -1,7 +1,7 @@
-#include "ConsoleWnd.h"
+#include "ConsoleWnd.hpp"
 
-#include "ConsoleHost.h"
-#include "NewConsole.h"
+#include "ConsoleHost.hpp"
+#include "NewConsole.hpp"
 
 ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd) : 
 	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1)

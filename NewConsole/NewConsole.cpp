@@ -1,8 +1,8 @@
-#include "NewConsole.h"
+#include "NewConsole.hpp"
 #include <gdiplus.h>
 
-#include "ConsoleHostServer.h"
-#include "ConsoleWnd.h"
+#include "ConsoleHostServer.hpp"
+#include "ConsoleWnd.hpp"
 
 #pragma comment(lib, "gdiplus.lib")
 

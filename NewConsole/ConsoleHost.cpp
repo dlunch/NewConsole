@@ -1,13 +1,13 @@
-#include "ConsoleHost.h"
+#include "ConsoleHost.hpp"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "ConsoleHostServer.h"
-#include "TargetProtocol.h"
-#include "Win32Structure.h"
-#include "ConsoleEventListener.h"
-#include "ConsoleInternal.h"
+#include "ConsoleHostServer.hpp"
+#include "TargetProtocol.hpp"
+#include "Win32Structure.hpp"
+#include "ConsoleEventListener.hpp"
+#include "ConsoleInternal.hpp"
 
 //OpenConsole, GetConsoleMode, SetConsoleMode, ReadConsole, WriteConsole, GetConsoleTitle, GetConsoleScreenBufferInfo, GetConsoleLangId, VerifyConsoleIoHandle, GetConsoleCP, SetConsoleTitle
 const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0xb, 0x4c, 0x23, 0x3c, 0x25};

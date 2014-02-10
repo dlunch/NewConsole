@@ -150,16 +150,17 @@
     <ClCompile Include="Patcher.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ConsoleEventListener.h" />
-    <ClInclude Include="ConsoleHost.h" />
-    <ClInclude Include="ConsoleHostServer.h" />
-    <ClInclude Include="ConsoleInternal.h" />
-    <ClInclude Include="ConsoleWnd.h" />
-    <ClInclude Include="NewConsole.h" />
-    <ClInclude Include="Patcher.h" />
-    <ClInclude Include="TargetProtocol.h" />
+    <ClInclude Include="ConsoleEventListener.hpp" />
+    <ClInclude Include="ConsoleHost.hpp" />
+    <ClInclude Include="ConsoleHostServer.hpp" />
+    <ClInclude Include="ConsoleInternal.hpp" />
+    <ClInclude Include="ConsoleWnd.hpp" />
+    <ClInclude Include="NewConsole.hpp" />
+    <ClInclude Include="Patcher.hpp" />
+    <ClInclude Include="TargetProtocol.hpp" />
+    <ClInclude Include="TargetStub32.h" />
     <ClInclude Include="TargetStub64.h" />
-    <ClInclude Include="Win32Structure.h" />
+    <ClInclude Include="Win32Structure.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -32,34 +32,37 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ConsoleHost.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="TargetProtocol.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="TargetStub64.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Win32Structure.h">
+    <ClInclude Include="ConsoleEventListener.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Patcher.h">
+    <ClInclude Include="ConsoleHost.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ConsoleHostServer.h">
+    <ClInclude Include="ConsoleHostServer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ConsoleWnd.h">
+    <ClInclude Include="ConsoleInternal.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ConsoleEventListener.h">
+    <ClInclude Include="ConsoleWnd.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="NewConsole.h">
+    <ClInclude Include="NewConsole.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ConsoleInternal.h">
+    <ClInclude Include="Patcher.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TargetProtocol.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32Structure.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TargetStub32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

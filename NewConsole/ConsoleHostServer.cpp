@@ -1,13 +1,13 @@
-#include "ConsoleHostServer.h"
+#include "ConsoleHostServer.hpp"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #include <list>
 
-#include "TargetProtocol.h"
-#include "ConsoleHost.h"
-#include "Patcher.h"
+#include "TargetProtocol.hpp"
+#include "ConsoleHost.hpp"
+#include "Patcher.hpp"
 
 struct ConsoleHostServerData
 {
