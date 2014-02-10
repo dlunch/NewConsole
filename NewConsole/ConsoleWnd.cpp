@@ -96,7 +96,7 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 		while(true)
 		{
 			-- it;
-			if(it == begin)
+			if(it == begin && (host_->getInputMode() & ENABLE_ECHO_INPUT))
 			{
 				std::wstring tmp = it->first + inputBuffer_;
 				g.DrawString(tmp.c_str(), static_cast<int>(tmp.size()), &font, screen, &format, &whiteBrush);
@@ -123,6 +123,11 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 
 void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 {
+	if(!(host_->getInputMode() & ENABLE_LINE_INPUT))
+	{
+		host_->write(buffer);
+		return;
+	}
 	std::wstring buf;
 	size_t end = buffer.find(L'\n');
 	size_t start = 0;
@@ -146,7 +151,8 @@ void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 	}
 
 	inputBuffer_ += buf;
-	bufferUpdated();
+	if(host_->getInputMode() & ENABLE_ECHO_INPUT)
+		bufferUpdated();
 }
 
 void ConsoleWnd::bufferUpdated()
