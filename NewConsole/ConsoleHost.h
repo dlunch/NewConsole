@@ -64,4 +64,6 @@ public:
 	void handlePacket(uint16_t op, uint32_t size, uint8_t *data);
 	void handleDisconnected();
 	void setConnection(ConsoleHostConnection *connection);
+
+	uint32_t getInputMode();
 };

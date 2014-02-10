@@ -96,7 +96,14 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 		while(true)
 		{
 			-- it;
-			g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font, screen, &format, &whiteBrush);
+			if(it == begin)
+			{
+				std::wstring tmp = it->first + inputBuffer_;
+				g.DrawString(tmp.c_str(), static_cast<int>(tmp.size()), &font, screen, &format, &whiteBrush);
+			}
+			else
+				g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font, screen, &format, &whiteBrush);
+			
 			screen.Y += it->second;
 
 			if(it == begin)
@@ -116,13 +123,26 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 
 void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 {
-	std::wstring buf = buffer;
-	size_t pos = buf.find('\n');
-	while(pos != std::string::npos)
+	std::wstring buf;
+	size_t end = buffer.find(L'\n');
+	size_t start = 0;
+	if(end == std::string::npos)
+		buf = buffer;
+	else
 	{
-		if(!(pos > 0 && buf[pos - 1] == L'\r'))
-			buf.insert(pos, L"\r");
-		pos = buf.find(L'\n', pos + 2);
+		while(end != std::wstring::npos)
+		{
+			buf = inputBuffer_;
+			buf.append(buffer.begin() + start, buffer.begin() + end);
+			buf.append(L"\r\n");
+			inputBuffer_.clear();
+			host_->write(buf);
+			appendStringToBuffer(buf);
+
+			start = end + 1;
+			end = buffer.find(L'\n', start);
+		}
+		buf = buffer.substr(start);
 	}
 
 	inputBuffer_ += buf;

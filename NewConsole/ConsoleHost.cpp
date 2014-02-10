@@ -520,11 +520,11 @@ void ConsoleHost::checkQueuedRead()
 				WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, buf, len, 0, 0);
 				buf[len - 1] = 0;
 
-				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), (len - 1) * 2, len - 1, std::get<3>(i));
+				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), len, len - 1, std::get<3>(i));
 				delete [] buf;
 			}
 			else
-				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size(), buffer.size(), std::get<3>(i));
+				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size() * 2, buffer.size() - 1, std::get<3>(i));
 
 			queuedReadOperations_.pop_front();
 		}
@@ -542,7 +542,7 @@ void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideCha
 		MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize / 2), reinterpret_cast<LPTSTR>(&stringBuf[0]), size);
 	}
 	else
-		stringBuf.assign(buffer, buffer + bufferSize);
+		stringBuf.assign(reinterpret_cast<wchar_t *>(buffer), reinterpret_cast<wchar_t *>(buffer) + bufferSize / 2);
 	listener_->handleWrite(stringBuf);
 }
 
@@ -567,4 +567,9 @@ void ConsoleHost::setConsoleMode(void *handle, uint32_t mode)
 void ConsoleHost::setConnection(ConsoleHostConnection *connection)
 {
 	connection_ = connection;
+}
+
+uint32_t ConsoleHost::getInputMode()
+{
+	return inputMode_;
 }
