@@ -53,7 +53,7 @@ public:
 	~ConsoleWnd();
 
 	void drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly);
-	void appendInputBuffer(const std::wstring &buffer);
+	bool appendInputBuffer(const std::wstring &buffer);
 	void activated();
 
 private:

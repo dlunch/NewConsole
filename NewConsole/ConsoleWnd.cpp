@@ -160,41 +160,64 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 	g.DrawImage(cacheBitmap_.get(), x, y);
 }
 
-void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
+bool ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 {
 	if(!(host_->getInputMode() & ENABLE_LINE_INPUT))
 	{
 		host_->write(buffer);
-		return;
+		return true;
 	}
+	bool hasSelection = false;
 	if(selStart_ != selEnd_)
-		//TODO: remove
-		selStart_ = selEnd_;
+	{
+		hasSelection = true;
+		inputBuffer_.erase(selStart_, selStart_ - selEnd_ + 1);
+	}
 	inputBuffer_.insert(selEnd_, buffer);
 	selEnd_ += buffer.size();
 	selStart_ = selEnd_;
 
-	size_t end = inputBuffer_.find(L'\n');
-	size_t start = 0;
-	while(end != std::wstring::npos)
+	if(buffer.find(L'\b') != std::wstring::npos) //backspace
 	{
-		std::wstring buffer(inputBuffer_.begin() + start, inputBuffer_.begin() + end);
-		inputBuffer_.erase(inputBuffer_.begin() + start, inputBuffer_.begin() + end + 1);
-
-		selStart_ = selEnd_ = inputBuffer_.size();
-		isSelectionInterim_ = false;
-		isSelectionEndsAtLeft_ = false;
-
-		buffer.append(L"\r\n");
-		host_->write(buffer);
-		appendStringToBuffer(buffer);
-
-		start = end + 1;
-		end = inputBuffer_.find(L'\n', start);
+		if(inputBuffer_.size() == 1)
+		{
+			selStart_ = selEnd_ = 0;
+			inputBuffer_.clear();
+			return false;
+		}
+		size_t pos = inputBuffer_.find(L'\b');
+		while(pos != std::wstring::npos)
+		{
+			inputBuffer_.erase(pos - 1, (hasSelection ? 1 : 2));
+			selStart_ = selEnd_ = pos - 1;
+			pos = inputBuffer_.find(L'\b');
+		}
 	}
 
+	if(buffer.find(L'\n') != std::wstring::npos)
+	{
+		size_t end = inputBuffer_.find(L'\n');
+		size_t start = 0;
+		while(end != std::wstring::npos)
+		{
+			std::wstring buffer(inputBuffer_.begin() + start, inputBuffer_.begin() + end);
+			inputBuffer_.erase(inputBuffer_.begin() + start, inputBuffer_.begin() + end + 1);
+
+			selStart_ = selEnd_ = inputBuffer_.size();
+			isSelectionInterim_ = false;
+			isSelectionEndsAtLeft_ = false;
+
+			buffer.append(L"\r\n");
+			host_->write(buffer);
+			appendStringToBuffer(buffer);
+
+			start = end + 1;
+			end = inputBuffer_.find(L'\n', start);
+		}
+	}
 	if(host_->getInputMode() & ENABLE_ECHO_INPUT)
 		inputBufferUpdated();
+	return true;
 }
 
 void ConsoleWnd::bufferUpdated()
