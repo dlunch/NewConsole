@@ -46,7 +46,6 @@ private:
 	void invalidateCache();
 	void bufferUpdated();
 	void inputBufferUpdated();
-	void drawInputEcho();
 	void appendStringToBuffer(const std::wstring &buffer);
 public:
 	ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd);
@@ -54,6 +53,7 @@ public:
 
 	void drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly);
 	bool appendInputBuffer(const std::wstring &buffer);
+	bool onKeyDown(int vk);
 	void activated();
 
 private:

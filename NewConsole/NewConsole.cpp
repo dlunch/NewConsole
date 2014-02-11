@@ -147,10 +147,10 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 			if(len > 0)
 			{
 				temp.resize(len);
-				if(temp[0] == L'\r')
-					temp[0] = L'\n';
 				activeConsole_.lock()->appendInputBuffer(temp);
 			}
+			else
+				activeConsole_.lock()->onKeyDown(static_cast<int>(wParam));
 		}
 		return 0;
 	case WM_SETFOCUS:

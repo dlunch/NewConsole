@@ -141,14 +141,9 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	}
 }
 
-void ConsoleWnd::drawInputEcho()
-{
-
-}
-
 void ConsoleWnd::inputBufferUpdated()
 {
-	bufferUpdated(); //TODO
+	bufferUpdated();
 }
 
 void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly)
@@ -158,6 +153,36 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 
 	Gdiplus::Graphics g(hdc);
 	g.DrawImage(cacheBitmap_.get(), x, y);
+}
+
+bool ConsoleWnd::onKeyDown(int vk)
+{
+	if(vk == VK_LEFT)
+	{
+		if(selStart_ != selEnd_)
+			selStart_ = selEnd_;
+		else if(selStart_ > 0)
+		{
+			selStart_ --;
+			selEnd_ = selStart_;
+		}
+	}
+	else if(vk == VK_RIGHT)
+	{
+		if(selStart_ != selEnd_)
+			selEnd_ = selStart_;
+		else if(selStart_ < inputBuffer_.size())
+		{
+			selStart_ ++;
+			selEnd_ = selStart_;
+		}
+	}
+	else if(vk == VK_UP)
+		return false;
+	else if(vk == VK_DOWN)
+		return false;
+
+	return false;
 }
 
 bool ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
