@@ -141,6 +141,16 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	}
 }
 
+void ConsoleWnd::drawInputEcho()
+{
+
+}
+
+void ConsoleWnd::inputBufferUpdated()
+{
+	bufferUpdated(); //TODO
+}
+
 void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly)
 {
 	if(scrolly != cacheScrolly_ || scrollx != cacheScrollx_ || width != cacheWidth_ || height != cacheHeight_)
@@ -162,6 +172,7 @@ void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 		selStart_ = selEnd_;
 	inputBuffer_.insert(selEnd_, buffer);
 	selEnd_ += buffer.size();
+	selStart_ = selEnd_;
 
 	size_t end = inputBuffer_.find(L'\n');
 	size_t start = 0;
@@ -183,7 +194,7 @@ void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 	}
 
 	if(host_->getInputMode() & ENABLE_ECHO_INPUT)
-		bufferUpdated();
+		inputBufferUpdated();
 }
 
 void ConsoleWnd::bufferUpdated()
@@ -283,16 +294,50 @@ STDMETHODIMP ConsoleWnd::GetSelection(ULONG ulIndex, ULONG ulCount, TS_SELECTION
 
 STDMETHODIMP ConsoleWnd::SetSelection(ULONG ulCount, const TS_SELECTION_ACP *pSelection)
 {
+	if(ulCount && pSelection)
+	{
+		selStart_ = pSelection->acpStart;
+		selEnd_ = pSelection->acpEnd;
+		isSelectionEndsAtLeft_ = (pSelection->style.ase & TS_AE_START ? true : false);
+		isSelectionInterim_ = (pSelection->style.fInterimChar == TRUE);
+
+		inputBufferUpdated();
+	}
 	return S_OK;
 }
 
-STDMETHODIMP ConsoleWnd::GetText(LONG acpStart, LONG acpEnd, WCHAR *pchPlain, ULONG cchPlainReq, ULONG *pcchPlainOut, TS_RUNINFO *prgRunInfo, ULONG ulRunInfoReq, ULONG *pulRunInfoOut, LONG *pacpNext)
+STDMETHODIMP ConsoleWnd::GetText(LONG acpStart, LONG acpEnd, WCHAR *pchPlain, ULONG cchPlainReq, ULONG *pcchPlainOut, TS_RUNINFO *prgRunInfo, 
+								 ULONG ulRunInfoReq, ULONG *pulRunInfoOut, LONG *pacpNext)
 {
+	if(acpEnd == -1)
+		acpEnd = static_cast<LONG>(inputBuffer_.size() - 1);
+	auto out = stdext::checked_array_iterator<wchar_t *>(pchPlain, cchPlainReq);
+	std::copy(inputBuffer_.begin() + acpStart, inputBuffer_.begin() + acpEnd + 1, out);
+	*pcchPlainOut = acpEnd - acpStart + 1;
+
+	if(ulRunInfoReq && pchPlain)
+	{
+		prgRunInfo->uCount = *pcchPlainOut;
+		prgRunInfo->type = TS_RT_PLAIN;
+		*pulRunInfoOut = 1;
+	}
+	else
+		*pulRunInfoOut = 0;
+	*pacpNext = acpEnd + 1;
 	return S_OK;
 }
 
 STDMETHODIMP ConsoleWnd::SetText(DWORD dwFlags, LONG acpStart, LONG acpEnd, const WCHAR *pchText, ULONG cch, TS_TEXTCHANGE *pChange)
 {
+	if(acpStart != acpEnd)
+		inputBuffer_.erase(acpStart, acpEnd - acpStart + 1);
+	inputBuffer_.insert(acpStart, pchText, cch);
+
+	pChange->acpStart = acpStart;
+	pChange->acpOldEnd = acpEnd;
+	pChange->acpNewEnd = acpStart + cch;
+	inputBufferUpdated();
+
 	return S_OK;
 }
 
@@ -323,6 +368,23 @@ STDMETHODIMP ConsoleWnd::GetWnd(TsViewCookie vcView, HWND *phwnd)
 
 STDMETHODIMP ConsoleWnd::InsertTextAtSelection(DWORD dwFlags, const WCHAR *pchText, ULONG cch, LONG *pacpStart, LONG *pacpEnd, TS_TEXTCHANGE *pChange)
 {
+	if(!(dwFlags & TF_IAS_QUERYONLY))
+	{
+		if(selStart_ != selEnd_)
+			inputBuffer_.erase(selStart_, selEnd_ - selStart_ + 1);
+		inputBuffer_.insert(selStart_, pchText, cch);
+	}
+	if(!(dwFlags & TF_IAS_NOQUERY))
+	{
+		*pacpStart = static_cast<LONG>(selStart_);
+		*pacpEnd = static_cast<LONG>(selStart_) + cch;
+	}
+
+	pChange->acpStart = static_cast<LONG>(selStart_);
+	pChange->acpOldEnd = static_cast<LONG>(selEnd_);
+	pChange->acpNewEnd = static_cast<LONG>(selEnd_) + cch;
+
+	inputBufferUpdated();
 	return S_OK;
 }
 STDMETHODIMP ConsoleWnd::InsertEmbeddedAtSelection(DWORD dwFlags, IDataObject *pDataObject, LONG *pacpStart, LONG *pacpEnd, TS_TEXTCHANGE *pChange){return E_NOTIMPL;}
