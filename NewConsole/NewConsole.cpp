@@ -137,13 +137,18 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 			DeleteObject(mainBitmap_);
 		mainBitmap_ = nullptr;
 		return 0;
-	case WM_CHAR:
+	case WM_KEYDOWN:
 		if(!activeConsole_.expired())
 		{
-			char data = static_cast<char>(wParam);
-			if(data == '\r')
-				data = '\n';
-			activeConsole_.lock()->appendInputBuffer(std::wstring(1, data));
+			BYTE state[256];
+			GetKeyboardState(state);
+			std::wstring temp(10, L' ');
+			int len = ToUnicode(static_cast<UINT>(wParam), HIWORD(lParam) & 0xff, state, &temp[0], 10, 0);
+			if(len > 0)
+			{
+				temp.resize(len);
+				activeConsole_.lock()->appendInputBuffer(temp);
+			}
 		}
 		return 0;
 	case WM_SETFOCUS:
