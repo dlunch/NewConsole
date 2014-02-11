@@ -28,4 +28,5 @@ public:
 
 	int run(int nShowCmd);
 	void contentsUpdated(std::weak_ptr<ConsoleWnd> wnd);
+	HWND gethWnd();
 };

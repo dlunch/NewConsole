@@ -3,14 +3,43 @@
 #include "ConsoleHost.hpp"
 #include "NewConsole.hpp"
 
+ITfThreadMgr *ConsoleWnd::tsfThreadMgr_;
+TfClientId ConsoleWnd::tsfClientId_;
+
 ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd) : 
-	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1)
+	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1),
+	tsfDocumentMgr_(nullptr), tsfContext_(nullptr), tsfACPSink_(nullptr), 
+	selStart_(0), selEnd_(0), isSelectionInterim_(false), isSelectionEndsAtLeft_(false)
 {
+	if(!tsfThreadMgr_)
+	{
+		HRESULT hr = CoCreateInstance(CLSID_TF_ThreadMgr, 0, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr, reinterpret_cast<void **>(&tsfThreadMgr_));
+		tsfThreadMgr_->Activate(&tsfClientId_);
+	}
+
+	tsfThreadMgr_->CreateDocumentMgr(&tsfDocumentMgr_);
+
+	IUnknown *thisUnknown;
+	QueryInterface(IID_IUnknown, reinterpret_cast<void **>(&thisUnknown));
+	tsfDocumentMgr_->CreateContext(tsfClientId_, 0, thisUnknown, &tsfContext_, &tsfEditCookie_);
+	tsfDocumentMgr_->Push(tsfContext_);
+
 	host_.reset(new ConsoleHost(cmdline, this));
 }
 
 ConsoleWnd::~ConsoleWnd()
 {
+	if(tsfACPSink_)
+		tsfACPSink_->Release();
+	if(tsfContext_)
+		tsfContext_->Release();
+	if(tsfDocumentMgr_)
+		tsfDocumentMgr_->Release();
+}
+
+void ConsoleWnd::activated()
+{
+	tsfThreadMgr_->SetFocus(tsfDocumentMgr_);
 }
 
 void ConsoleWnd::appendStringToBuffer(const std::wstring &buffer)
@@ -128,29 +157,31 @@ void ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
 		host_->write(buffer);
 		return;
 	}
-	std::wstring buf;
-	size_t end = buffer.find(L'\n');
-	size_t start = 0;
-	if(end == std::string::npos)
-		buf = buffer;
-	else
-	{
-		while(end != std::wstring::npos)
-		{
-			buf = inputBuffer_;
-			buf.append(buffer.begin() + start, buffer.begin() + end);
-			buf.append(L"\r\n");
-			inputBuffer_.clear();
-			host_->write(buf);
-			appendStringToBuffer(buf);
+	if(selStart_ != selEnd_)
+		//TODO: remove
+		selStart_ = selEnd_;
+	inputBuffer_.insert(selEnd_, buffer);
+	selEnd_ += buffer.size();
 
-			start = end + 1;
-			end = buffer.find(L'\n', start);
-		}
-		buf = buffer.substr(start);
+	size_t end = inputBuffer_.find(L'\n');
+	size_t start = 0;
+	while(end != std::wstring::npos)
+	{
+		std::wstring buffer(inputBuffer_.begin() + start, inputBuffer_.begin() + end);
+		inputBuffer_.erase(inputBuffer_.begin() + start, inputBuffer_.begin() + end + 1);
+
+		selStart_ = selEnd_ = inputBuffer_.size();
+		isSelectionInterim_ = false;
+		isSelectionEndsAtLeft_ = false;
+
+		buffer.append(L"\r\n");
+		host_->write(buffer);
+		appendStringToBuffer(buffer);
+
+		start = end + 1;
+		end = inputBuffer_.find(L'\n', start);
 	}
 
-	inputBuffer_ += buf;
 	if(host_->getInputMode() & ENABLE_ECHO_INPUT)
 		bufferUpdated();
 }
@@ -165,4 +196,147 @@ void ConsoleWnd::bufferUpdated()
 void ConsoleWnd::invalidateCache()
 {
 	cacheScrollx_ = -1;
+}
+
+
+//IUnknown
+ULONG STDMETHODCALLTYPE ConsoleWnd::AddRef()
+{
+	return 1;
+}
+
+ULONG STDMETHODCALLTYPE ConsoleWnd::Release()
+{
+	return 1;
+}
+
+STDMETHODIMP ConsoleWnd::QueryInterface(REFIID riid, __RPC__deref_out void **ppvObject)
+{
+	if(riid == IID_IUnknown)
+		*ppvObject = static_cast<IUnknown *>(static_cast<ITextStoreACP *>(this));
+	else if(riid == IID_ITextStoreACP)
+		*ppvObject = static_cast<ITextStoreACP *>(this);
+	else if(riid == IID_ITfContextOwnerCompositionSink)
+		*ppvObject = static_cast<ITfContextOwnerCompositionSink *>(this);
+	else
+	{
+		*ppvObject = NULL;
+		return E_NOINTERFACE;
+	}
+
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::AdviseSink(REFIID riid, IUnknown *punk, DWORD dwMask)
+{
+	if(riid == IID_ITextStoreACPSink)
+	{
+		if(tsfACPSink_)
+			tsfACPSink_->Release();
+		punk->QueryInterface(&tsfACPSink_);
+		tsfACPSink_->AddRef();
+	}
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::UnadviseSink(IUnknown *punk)
+{
+	ITextStoreACPSink *sink;
+	punk->QueryInterface(&sink);
+	if(sink == tsfACPSink_)
+	{
+		tsfACPSink_->Release();
+		tsfACPSink_ = nullptr;
+	}
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::RequestLock(DWORD dwLockFlags, HRESULT *phrSession)
+{
+	if(!tsfACPSink_)
+		return E_UNEXPECTED;
+	*phrSession = tsfACPSink_->OnLockGranted(dwLockFlags);
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::GetStatus(TS_STATUS *pdcs)
+{
+	pdcs->dwDynamicFlags = 0;
+	pdcs->dwStaticFlags = TS_SS_NOHIDDENTEXT;
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::QueryInsert(LONG acpTestStart, LONG acpTestEnd, ULONG cch, LONG *pacpResultStart, LONG *pacpResultEnd){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::GetSelection(ULONG ulIndex, ULONG ulCount, TS_SELECTION_ACP *pSelection, ULONG *pcFetched)
+{
+	*pcFetched = 0;
+	if(ulCount)
+	{
+		pSelection->acpStart = static_cast<LONG>(selStart_);
+		pSelection->acpEnd = static_cast<LONG>(selEnd_);
+		pSelection->style.ase = (isSelectionEndsAtLeft_ ? TS_AE_START : TS_AE_END);
+		pSelection->style.fInterimChar = (isSelectionInterim_ ? TRUE : FALSE);
+		*pcFetched = 1;
+	}
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::SetSelection(ULONG ulCount, const TS_SELECTION_ACP *pSelection)
+{
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::GetText(LONG acpStart, LONG acpEnd, WCHAR *pchPlain, ULONG cchPlainReq, ULONG *pcchPlainOut, TS_RUNINFO *prgRunInfo, ULONG ulRunInfoReq, ULONG *pulRunInfoOut, LONG *pacpNext)
+{
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::SetText(DWORD dwFlags, LONG acpStart, LONG acpEnd, const WCHAR *pchText, ULONG cch, TS_TEXTCHANGE *pChange)
+{
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::GetFormattedText(LONG acpStart, LONG acpEnd, IDataObject **ppDataObject){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::GetEmbedded(LONG acpPos, REFGUID rguidService, REFIID riid, IUnknown **ppunk){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::QueryInsertEmbedded(const GUID *pguidService, const FORMATETC *pFormatEtc, BOOL *pfInsertable){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::InsertEmbedded(DWORD dwFlags, LONG acpStart, LONG acpEnd, IDataObject *pDataObject, TS_TEXTCHANGE *pChange){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::RequestSupportedAttrs(DWORD dwFlags, ULONG cFilterAttrs, const TS_ATTRID *paFilterAttrs){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::RequestAttrsAtPosition(LONG acpPos, ULONG cFilterAttrs, const TS_ATTRID *paFilterAttrs, DWORD dwFlags){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::RequestAttrsTransitioningAtPosition(LONG acpPos, ULONG cFilterAttrs, const TS_ATTRID *paFilterAttrs, DWORD dwFlags){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::FindNextAttrTransition(LONG acpStart, LONG acpHalt, ULONG cFilterAttrs, const TS_ATTRID *paFilterAttrs, DWORD dwFlags, LONG *pacpNext, BOOL *pfFound, LONG *plFoundOffset){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::RetrieveRequestedAttrs(ULONG ulCount, TS_ATTRVAL *paAttrVals, ULONG *pcFetched){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::GetEndACP(LONG *pacp){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::GetActiveView(TsViewCookie *pvcView)
+{
+	*pvcView = 0;
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::GetACPFromPoint(TsViewCookie vcView, const POINT *pt, DWORD dwFlags, LONG *pacp){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::GetTextExt(TsViewCookie vcView, LONG acpStart, LONG acpEnd, RECT *prc, BOOL *pfClipped){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::GetScreenExt(TsViewCookie vcView, RECT *prc){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::GetWnd(TsViewCookie vcView, HWND *phwnd)
+{
+	*phwnd = mainWnd_.lock()->gethWnd();
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::InsertTextAtSelection(DWORD dwFlags, const WCHAR *pchText, ULONG cch, LONG *pacpStart, LONG *pacpEnd, TS_TEXTCHANGE *pChange)
+{
+	return S_OK;
+}
+STDMETHODIMP ConsoleWnd::InsertEmbeddedAtSelection(DWORD dwFlags, IDataObject *pDataObject, LONG *pacpStart, LONG *pacpEnd, TS_TEXTCHANGE *pChange){return E_NOTIMPL;}
+
+STDMETHODIMP ConsoleWnd::OnStartComposition(ITfCompositionView *pComposition, BOOL *pfOk)
+{
+	pComposition->AddRef();
+	*pfOk = TRUE;
+	return S_OK;
+}
+
+STDMETHODIMP ConsoleWnd::OnUpdateComposition(ITfCompositionView *pComposition, ITfRange *pRangeNew){return E_NOTIMPL;}
+STDMETHODIMP ConsoleWnd::OnEndComposition(ITfCompositionView *pComposition)
+{
+	pComposition->Release();
+	return S_OK;
 }

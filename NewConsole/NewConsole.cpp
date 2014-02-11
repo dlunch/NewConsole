@@ -11,6 +11,7 @@ NewConsole::NewConsole() : mainDC_(CreateCompatibleDC(nullptr)), mainBitmap_(nul
 	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &mainThread_, 0, FALSE, DUPLICATE_SAME_ACCESS);
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	Gdiplus::GdiplusStartup(&gdiplusToken_, &gdiplusStartupInput, nullptr);
+	CoInitialize(nullptr);
 
 	ConsoleHostServer::initialize();
 }
@@ -20,6 +21,7 @@ NewConsole::~NewConsole()
 	consoles_.clear();
 	CloseHandle(mainThread_);
 	Gdiplus::GdiplusShutdown(gdiplusToken_);
+	CoUninitialize();
 
 	DeleteDC(mainDC_);
 }
@@ -42,6 +44,7 @@ int NewConsole::run(int nShowCmd)
 
 	consoles_.push_back(std::make_shared<ConsoleWnd>(L"C:\\windows\\system32\\cmd.exe", shared_from_this()));
 	activeConsole_ = *consoles_.begin();
+	activeConsole_.lock()->activated();
 
 	MSG msg;
 	while(true)
@@ -117,6 +120,11 @@ void NewConsole::redraw()
 	redrawQueued_ = true;
 }
 
+HWND NewConsole::gethWnd()
+{
+	return mainWnd_;
+}
+
 LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 {
 	switch(iMessage)
@@ -137,6 +145,10 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 				data = '\n';
 			activeConsole_.lock()->appendInputBuffer(std::wstring(1, data));
 		}
+		return 0;
+	case WM_SETFOCUS:
+		if(!activeConsole_.expired())
+			activeConsole_.lock()->activated();
 		return 0;
 	}
 	return DefWindowProc(mainWnd_, iMessage, wParam, lParam);

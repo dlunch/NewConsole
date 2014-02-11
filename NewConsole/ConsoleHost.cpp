@@ -498,34 +498,29 @@ void ConsoleHost::queueReadOperation(size_t size, const std::function<void (cons
 
 void ConsoleHost::checkQueuedRead()
 {
+	if(!inputBuffer_.size())
+	   return;
 	while(queuedReadOperations_.size())
 	{
 		auto &i = queuedReadOperations_.front();
-		if(inputMode_ & ENABLE_LINE_INPUT)
+		if(inputMode_ & ENABLE_LINE_INPUT) //input is given line by line on line input mode.
 		{
-			size_t newlineOff = inputBuffer_.find(L"\r\n");
-			if(newlineOff == std::string::npos)
-				break;
-			newlineOff += 2;
-			std::wstring buffer(inputBuffer_.begin(), inputBuffer_.begin() + newlineOff);
-			inputBuffer_.erase(0, newlineOff);
-
 			if(std::get<2>(i) == false)
 			{
 				char *buf;
 				int len;
 
-				len = WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0, 0, 0);
+				len = WideCharToMultiByte(CP_UTF8, 0, inputBuffer_.c_str(), -1, nullptr, 0, 0, 0);
 				buf = new char[len];
-				WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, buf, len, 0, 0);
+				WideCharToMultiByte(CP_UTF8, 0, inputBuffer_.c_str(), -1, buf, len, 0, 0);
 				buf[len - 1] = 0;
 
 				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), len, len - 1, std::get<3>(i));
 				delete [] buf;
 			}
 			else
-				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size() * 2, buffer.size() - 1, std::get<3>(i));
-
+				std::get<1>(i)(reinterpret_cast<const uint8_t *>(inputBuffer_.c_str()), inputBuffer_.size() * 2, inputBuffer_.size() - 1, std::get<3>(i));
+			inputBuffer_.clear();
 			queuedReadOperations_.pop_front();
 		}
 	}
