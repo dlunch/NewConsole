@@ -147,6 +147,8 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 			if(len > 0)
 			{
 				temp.resize(len);
+				if(temp[0] == L'\r' && len == 1)
+					temp[0] = L'\n';
 				activeConsole_.lock()->appendInputBuffer(temp);
 			}
 			else
