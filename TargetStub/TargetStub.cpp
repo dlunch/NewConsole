@@ -2,8 +2,8 @@
 
 #include <intrin.h>
 
-#include "../NewConsole/Win32Structure.h"
-#include "../NewConsole/TargetProtocol.h"
+#include "../NewConsole/Win32Structure.hpp"
+#include "../NewConsole/TargetProtocol.hpp"
 
 typedef uint32_t (__stdcall *NtCreateFile)(void **FileHandle, int DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, 
 										 PLARGE_INTEGER AllocationSize, size_t FileAttributes, size_t ShareAccess, 
