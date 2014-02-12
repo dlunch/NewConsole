@@ -360,7 +360,7 @@ STDMETHODIMP ConsoleWnd::GetText(LONG acpStart, LONG acpEnd, WCHAR *pchPlain, UL
 	if(acpEnd == -1)
 		acpEnd = static_cast<LONG>(inputBuffer_.size() - 1);
 	auto out = stdext::checked_array_iterator<wchar_t *>(pchPlain, cchPlainReq);
-	std::copy(inputBuffer_.begin() + acpStart, inputBuffer_.begin() + acpEnd + 1, out);
+	std::copy(inputBuffer_.begin() + acpStart, inputBuffer_.begin() + (acpEnd + 1), out);
 	*pcchPlainOut = acpEnd - acpStart + 1;
 
 	if(ulRunInfoReq && pchPlain)
@@ -378,7 +378,7 @@ STDMETHODIMP ConsoleWnd::GetText(LONG acpStart, LONG acpEnd, WCHAR *pchPlain, UL
 STDMETHODIMP ConsoleWnd::SetText(DWORD dwFlags, LONG acpStart, LONG acpEnd, const WCHAR *pchText, ULONG cch, TS_TEXTCHANGE *pChange)
 {
 	if(acpStart != acpEnd)
-		inputBuffer_.erase(acpStart, acpEnd - acpStart + 1);
+		inputBuffer_.erase(acpStart, acpEnd - acpStart);
 	inputBuffer_.insert(acpStart, pchText, cch);
 
 	pChange->acpStart = acpStart;
