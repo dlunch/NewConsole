@@ -33,9 +33,7 @@ class ConsoleHost
 private:
 	int inputMode_;
 	int outputMode_;
-	void *childProcess_;
-	uint32_t childProcessId_;
-	ConsoleHostConnection *connection_;
+	std::list<void *> childProcesses_;
 	ConsoleEventListener *listener_;
 	bool active_;
 	int lastHandleId_;
@@ -43,12 +41,9 @@ private:
 	std::list<void *> outputHandles_;
 	std::list<void *> serverHandles_;
 	ssize_t csrssMemoryDiff_;
-	std::shared_ptr<ConsoleHost> childHost_;
 	std::queue<ConsoleReadOperation> queuedReadOperations_;
 
 private:
-	ConsoleHost(void *childProcess, ConsoleEventListener *listener);
-
 	void setDefaultMode();
 	void *newFakeHandle();
 	void cleanup();
@@ -61,25 +56,24 @@ private:
 	uint32_t getConsoleMode(void *handle);
 	void getConsoleScreenBufferInfo(GetConsoleScreenBufferInfoExResponse *response);
 
-	void sendNewConsoleAPIResponse(void *responsePtr, void *buffer, size_t bufferSize);
+	void sendNewConsoleAPIResponse(ConsoleHostConnection *connection, void *responsePtr, void *buffer, size_t bufferSize);
 	template<typename T>
-	void sendNewConsoleAPIResponse(void *responsePtr, T data)
+	void sendNewConsoleAPIResponse(ConsoleHostConnection *connection, void *responsePtr, T data)
 	{
-		return sendNewConsoleAPIResponse(responsePtr, &data, sizeof(T));
+		return sendNewConsoleAPIResponse(connection, responsePtr, &data, sizeof(T));
 	}
-	void sendCSRSSConsoleAPIResponse(CSRSSLPCMessageHeader *messageHeader);
-	std::vector<uint8_t> readCSRSSCaptureData(CSRSSLPCMessageHeader *messageHeader);
-	void writeCSRSSCaptureData(CSRSSLPCMessageHeader *messageHeader, const std::vector<uint8_t> &buffer);
-	void *getCSRSSCaptureBuffer(CSRSSLPCMessageHeader *messageHeader, void *requestPointer, const std::vector<uint8_t> &buffer, int n);
+	void sendCSRSSConsoleAPIResponse(ConsoleHostConnection *connection, CSRSSLPCMessageHeader *messageHeader);
+	std::vector<uint8_t> readCSRSSCaptureData(ConsoleHostConnection *connection, CSRSSLPCMessageHeader *messageHeader);
+	void writeCSRSSCaptureData(ConsoleHostConnection *connection, CSRSSLPCMessageHeader *messageHeader, const std::vector<uint8_t> &buffer);
+	void *getCSRSSCaptureBuffer(ConsoleHostConnection *connection, CSRSSLPCMessageHeader *messageHeader, void *requestPointer, const std::vector<uint8_t> &buffer, int n);
 public:
 	ConsoleHost(ConsoleEventListener *listener);
 	~ConsoleHost();
 
 	void startProcess(const std::wstring &cmdline);
 	void write(const std::wstring &buffer);
-	void handlePacket(uint16_t op, uint32_t size, uint8_t *data);
+	void handlePacket(ConsoleHostConnection *connection, uint16_t op, uint32_t size, uint8_t *data);
 	void handleDisconnected();
-	void setConnection(ConsoleHostConnection *connection);
 
 	uint32_t getInputMode();
 };

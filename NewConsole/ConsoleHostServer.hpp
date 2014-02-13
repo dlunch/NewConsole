@@ -17,6 +17,7 @@ private:
 	PacketHeader *header_;
 	uint8_t *buf_;
 	size_t totalReceived_;
+	void *userData_;
 
 	void readPacketHeader();
 
@@ -49,6 +50,9 @@ public:
 	{
 		sendPacketData(reinterpret_cast<const uint8_t *>(data), sizeof(T));
 	}
+
+	void setUserData(void *userData);
+	void *getUserData();
 };
 
 //static class

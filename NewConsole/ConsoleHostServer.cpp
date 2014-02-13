@@ -114,10 +114,13 @@ ConsoleHost *ConsoleHostServer::findConsoleHostByPid(uint32_t pid)
 	ConsoleHost *foundHost = nullptr;
 	for(auto &i : consoleHostServerData_->waitingHosts)
 	{
-		if(i->childProcessId_ == pid)
+		for(auto &j : i->childProcesses_)
 		{
-			foundHost = i;
-			break;
+			if(GetProcessId(j) == pid)
+			{
+				foundHost = i;
+				break;
+			}
 		}
 	}
 	consoleHostServerData_->waitingHosts.remove(foundHost);
@@ -199,11 +202,9 @@ void ConsoleHostConnection::dataReceived(IOOperation *op, size_t receivedSize)
 	{
 		InitializeRequest *request = reinterpret_cast<InitializeRequest *>(buf_);
 		host_ = ConsoleHostServer::findConsoleHostByPid(request->pid);
-		if(host_)
-			host_->setConnection(this);
 	}
 	if(host_)
-		host_->handlePacket(header_->op, header_->length, buf_);
+		host_->handlePacket(this, header_->op, header_->length, buf_);
 
 	delete [] buf_;
 	buf_ = nullptr;
@@ -217,4 +218,14 @@ void ConsoleHostConnection::disconnected(IOOperation *op)
 		host_->handleDisconnected();
 	CloseHandle(pipe_);
 	pipe_ = INVALID_HANDLE_VALUE;
+}
+
+void ConsoleHostConnection::setUserData(void *userData)
+{
+	userData_ = userData;
+}
+
+void *ConsoleHostConnection::getUserData()
+{
+	return userData_;
 }
