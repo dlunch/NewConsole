@@ -12,7 +12,12 @@
 
 typedef uint32_t (__stdcall *NtQueryInformationProcessType)(HANDLE ProcessHandle, int ProcessInformationClass, 
 														PVOID ProcessInformation, ULONG ProcessInformationLength, PULONG ReturnLength);
+
+typedef uint32_t (__stdcall *NtAllocateVirtualMemoryType)(HANDLE ProcessHandle, PVOID *BaseAddress, ULONG_PTR ZeroBits, PSIZE_T RegionSize, ULONG AllocationType, ULONG Protect);
+
 NtQueryInformationProcessType NtQueryInformationProcess;
+NtAllocateVirtualMemoryType NtAllocateVirtualMemory;
+
 struct TargetData64
 {
 	//For >Windows 8
@@ -124,15 +129,13 @@ void createTrampoline(uint8_t *dst, size_t functionAddr, size_t targetData)
 	}
 }
 
-void patchFunction(HANDLE processHandle, size_t dst, size_t trampoline)
+void patchFunction(HANDLE processHandle, size_t dst, int32_t trampoline)
 {
-	int32_t rel = static_cast<int32_t>(trampoline) - (static_cast<int32_t>(dst) + 5);
-
-	uint8_t buf[5] = {0xe9, };
-	*reinterpret_cast<int32_t *>(&buf[1]) = rel; //jmp rel32
+	uint8_t buf[6] = {0x68, 0x00, 0x00, 0x00, 0x00, 0xc3}; //push addr; ret
+	*reinterpret_cast<int32_t *>(&buf[1]) = trampoline;
 
 	//writeprocessmemory succeeds regardless of memory protection.
-	WriteProcessMemory(processHandle, reinterpret_cast<LPVOID>(dst), buf, 5, nullptr);
+	WriteProcessMemory(processHandle, reinterpret_cast<LPVOID>(dst), buf, 6, nullptr);
 }
 
 template<typename WordType>
@@ -144,7 +147,7 @@ WordType addHook(HANDLE processHandle, uint8_t *trampolineBase, size_t newFuncti
 	offset += originalFunctionSize + 1;
 
 	createTrampoline<sizeof(WordType)>(trampolineBase + offset, newFunction, reinterpret_cast<size_t>(targetTargetData));
-	patchFunction(processHandle, originalFunction, reinterpret_cast<size_t>(targetTrampolineBase + offset));
+	patchFunction(processHandle, originalFunction, reinterpret_cast<int32_t>(targetTrampolineBase + offset));
 
 	return originalAddress;
 }
@@ -158,15 +161,12 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 	void *targetTargetData = VirtualAllocEx(processHandle, 0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	const size_t trampolineSize = 1500;
 
-	size_t address = patchData->ntdllBase + 0x100000;
-	while(true)
-	{
-		//try to allocate trampoline near ntdll.
-		targetTrampolineData = reinterpret_cast<uint8_t *>(VirtualAllocEx(processHandle, reinterpret_cast<LPVOID>(address), 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE)); 
-		if(targetTrampolineData)
-			break;
-		address += 0x100000;
-	}
+	size_t zeroBits = 0;
+#ifdef _WIN64
+	zeroBits = 0x7ffe0000; //amd64 undocumented trick: larger zerobit act as a address mask.
+#endif
+	size_t size = 0x1000;
+	NtAllocateVirtualMemory(processHandle, reinterpret_cast<PVOID *>(&targetTrampolineData), zeroBits, &size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE); 
 
 	uint8_t *trampolineData = new uint8_t[trampolineSize];
 	ZeroMemory(trampolineData, trampolineSize);
@@ -269,7 +269,7 @@ void Patcher::initPatch()
 	patchData.ntRequestWaitReplyPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtRequestWaitReplyPort"));
 
 	NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcessType>(GetProcAddress(ntdllBase, "NtQueryInformationProcess"));
-	
+	NtAllocateVirtualMemory = reinterpret_cast<NtAllocateVirtualMemoryType>(GetProcAddress(ntdllBase, "NtAllocateVirtualMemory"));
 #ifdef _WIN64
 	patchData.syscallSize = 11; //mov r10, rcx; mov eax, <syscallno>; syscall; retn
 	patchData.HookedNtCreateFile = HookedNtCreateFileAddr64;
