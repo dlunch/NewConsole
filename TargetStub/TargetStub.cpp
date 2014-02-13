@@ -391,7 +391,8 @@ uint32_t __stdcall HookedNtConnectPort(TargetData *targetData, void **ClientPort
 
 	uint32_t ret = targetData->originalNtConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, ServerSharedMemory, MaximumMessageLength, 
 													 ConnectionInfo, ConnectionInfoLength);
-	onConnectPort(targetData, ClientSharedMemory->OtherSideViewBase, ClientSharedMemory->ViewBase);
+	if(ClientSharedMemory)
+		onConnectPort(targetData, ClientSharedMemory->OtherSideViewBase, ClientSharedMemory->ViewBase);
 	return ret;
 }
 
