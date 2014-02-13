@@ -13,7 +13,7 @@
 const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0xb, 0x4c, 0x23, 0x3c, 0x25};
 const uint16_t *g_csrssAPITable;
 
-ConsoleHost::ConsoleHost(ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0), active_(false)
+ConsoleHost::ConsoleHost(ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0)
 {	
 	if(!g_csrssAPITable)
 	{
@@ -155,7 +155,6 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 			serverHandles_.push_back(response.fakeHandle);
 		else if(!wcsncmp(fileName, L"\\Connect", 8))
 		{
-			active_ = true;
 			serverHandles_.push_back(response.fakeHandle);
 			void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
 			//TODO
@@ -416,7 +415,6 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 			}
 			else if(apiNumber == 0x53) //only in windows 7. ConsoleClientConnect
 			{
-				active_ = true;
 				std::vector<uint8_t> buffer = readCSRSSCaptureData(connection, messageHeader);
 
 				CSRSSConsoleClientConnectData *connectData = reinterpret_cast<CSRSSConsoleClientConnectData *>(

@@ -35,7 +35,6 @@ private:
 	int outputMode_;
 	std::list<void *> childProcesses_;
 	ConsoleEventListener *listener_;
-	bool active_;
 	int lastHandleId_;
 	std::list<void *> inputHandles_;
 	std::list<void *> outputHandles_;
