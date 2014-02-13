@@ -24,8 +24,7 @@ private:
 	TfEditCookie tsfEditCookie_;
 	ITextStoreACPSink *tsfACPSink_;
 private:
-	std::shared_ptr<ConsoleHost> masterHost_;
-	std::shared_ptr<ConsoleHost> activeHost_;
+	std::shared_ptr<ConsoleHost> host_;
 
 	std::shared_ptr<Gdiplus::Bitmap> cacheBitmap_;
 	int cacheScrollx_;
@@ -43,7 +42,6 @@ private:
 	std::mutex bufferLock_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
-	virtual void setActiveHost(std::shared_ptr<ConsoleHost> host);
 	virtual void handleRead(size_t size);
 	virtual void handleWrite(const std::wstring &buffer);
 

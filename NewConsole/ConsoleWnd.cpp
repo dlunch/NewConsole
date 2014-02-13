@@ -28,10 +28,8 @@ ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> ma
 	tsfDocumentMgr_->CreateContext(tsfClientId_, 0, thisUnknown, &tsfContext_, &tsfEditCookie_);
 	tsfDocumentMgr_->Push(tsfContext_);
 
-	masterHost_.reset(new ConsoleHost(this));
-	activeHost_ = masterHost_;
-
-	activeHost_->startProcess(cmdline);
+	host_.reset(new ConsoleHost(this));
+	host_->startProcess(cmdline);
 }
 
 ConsoleWnd::~ConsoleWnd()
@@ -132,7 +130,7 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 		while(true)
 		{
 			-- it;
-			if(it == begin && (activeHost_->getInputMode() & ENABLE_ECHO_INPUT))
+			if(it == begin && (host_->getInputMode() & ENABLE_ECHO_INPUT))
 			{
 				std::wstring tmp = it->first + inputBuffer_;
 				g.DrawString(tmp.c_str(), static_cast<int>(tmp.size()), &font, screen, &format, &whiteBrush);
@@ -214,7 +212,7 @@ bool ConsoleWnd::deleteOrBackspace(bool isBackspace)
 		selStart_ = selEnd_ = pos;
 	}
 
-	if(activeHost_->getInputMode() & ENABLE_ECHO_INPUT)
+	if(host_->getInputMode() & ENABLE_ECHO_INPUT)
 		inputBufferUpdated();
 	return true;
 }
@@ -223,10 +221,10 @@ void ConsoleWnd::checkPendingRead()
 {
 	if(!currentReadSize_)
 		return;
-	if(!(activeHost_->getInputMode() & ENABLE_LINE_INPUT))
+	if(!(host_->getInputMode() & ENABLE_LINE_INPUT))
 	{
 		size_t size = std::min(currentReadSize_, inputBuffer_.size());
-		activeHost_->write(inputBuffer_.substr(0, size));
+		host_->write(inputBuffer_.substr(0, size));
 		inputBuffer_.erase(0, size);
 	}
 	else
@@ -238,16 +236,11 @@ void ConsoleWnd::checkPendingRead()
 			std::wstring buffer = inputBuffer_.substr(0, pos);
 			appendStringToBuffer(buffer);
 			buffer.replace(buffer.end() - 1, buffer.end(), L"\r\n");
-			activeHost_->write(buffer);
+			host_->write(buffer);
 			inputBuffer_.erase(0, pos);
 			selStart_ = selEnd_ = 0;
 		}
 	}
-}
-
-void ConsoleWnd::setActiveHost(std::shared_ptr<ConsoleHost> host)
-{
-	activeHost_ = host;
 }
 
 void ConsoleWnd::handleRead(size_t size)
@@ -261,7 +254,7 @@ bool ConsoleWnd::appendCharacter(const std::wstring &buffer)
 	if(buffer.size() == 0)
 		return false;
 
-	if(!(activeHost_->getInputMode() & ENABLE_LINE_INPUT))
+	if(!(host_->getInputMode() & ENABLE_LINE_INPUT))
 		inputBuffer_.append(buffer);
 	else
 	{
@@ -282,7 +275,7 @@ bool ConsoleWnd::appendCharacter(const std::wstring &buffer)
 
 	checkPendingRead();
 
-	if(activeHost_->getInputMode() & ENABLE_ECHO_INPUT)
+	if(host_->getInputMode() & ENABLE_ECHO_INPUT)
 		inputBufferUpdated();
 	return true;
 }
