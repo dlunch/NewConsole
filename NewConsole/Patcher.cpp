@@ -165,7 +165,7 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 #ifdef _WIN64
 	zeroBits = 0x7ffe0000; //amd64 undocumented trick: larger zerobit act as a address mask.
 #endif
-	size_t size = 0x1000;
+	SIZE_T size = 0x1000;
 	NtAllocateVirtualMemory(processHandle, reinterpret_cast<PVOID *>(&targetTrampolineData), zeroBits, &size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE); 
 
 	uint8_t *trampolineData = new uint8_t[trampolineSize];

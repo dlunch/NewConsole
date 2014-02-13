@@ -468,7 +468,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 
 void *ConsoleHost::newFakeHandle()
 {
-	return reinterpret_cast<void *>((0xeeff00f3 | ((lastHandleId_ ++) << 8)));
+	return reinterpret_cast<void *>((0x6eff00f3 | ((lastHandleId_ ++) << 8)));
 }
 
 void ConsoleHost::getConsoleScreenBufferInfo(GetConsoleScreenBufferInfoExResponse *response)
