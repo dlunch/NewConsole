@@ -6,6 +6,15 @@ What's this?
 
 Simple console replacement for Windows.
 
+Features
+--------
+
+- UTF-8 console 
+- CJK input support (Using TSF)
+- Alpha background support
+- Many bugs
+
+
 Requirements
 ------------
 
