@@ -233,9 +233,11 @@ void ConsoleWnd::checkPendingRead()
 		{
 			pos ++;
 			std::wstring buffer = inputBuffer_.substr(0, pos);
+			appendStringToBuffer(buffer);
 			buffer.replace(buffer.end() - 1, buffer.end(), L"\r\n");
 			host_->write(buffer);
 			inputBuffer_.erase(0, pos);
+			selStart_ = selEnd_ = 0;
 		}
 	}
 }
