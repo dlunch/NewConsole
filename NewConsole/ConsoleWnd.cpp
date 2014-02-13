@@ -225,7 +225,7 @@ bool ConsoleWnd::appendCharacter(const std::wstring &buffer)
 		return false;
 
 	if(!(host_->getInputMode() & ENABLE_LINE_INPUT))
-		inputBuffer_ = buffer;
+		inputBuffer_.append(buffer);
 	else
 	{
 		bool hasSelection = false;
