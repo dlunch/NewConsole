@@ -4,5 +4,5 @@ class Patcher
 {
 public:
 	static void initPatch();
-	static void patchProcess(void *processHandle);
+	static bool patchProcess(void *processHandle);
 };

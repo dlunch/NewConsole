@@ -4,11 +4,15 @@
 #include <Windows.h>
 #include <exception>
 
+#include "Win32Structure.hpp"
 #include "TargetStub32.h"
 #ifdef _WIN64
 #include "TargetStub64.h"
 #endif
 
+typedef uint32_t (__stdcall *NtQueryInformationProcessType)(HANDLE ProcessHandle, int ProcessInformationClass, 
+														PVOID ProcessInformation, ULONG ProcessInformationLength, PULONG ReturnLength);
+NtQueryInformationProcessType NtQueryInformationProcess;
 struct TargetData64
 {
 	//For >Windows 8
@@ -217,8 +221,24 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 	delete [] trampolineData;
 }
 
-void Patcher::patchProcess(void *processHandle)
+bool Patcher::patchProcess(void *processHandle)
 {
+	//check subsystem
+	PROCESS_BASIC_INFORMATION pbi;
+	NtQueryInformationProcess(processHandle, 0, &pbi, sizeof(pbi), nullptr);
+	uint8_t header[0x1000];
+#ifdef _WIN64
+	PEB64 peb;
+#else
+	PEB32 peb;
+#endif
+	ReadProcessMemory(processHandle, pbi.PebBaseAddress, &peb, sizeof(peb), nullptr);
+	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(peb.ImageBaseAddress), header, sizeof(header), nullptr);
+	IMAGE_DOS_HEADER *dosHeader = reinterpret_cast<IMAGE_DOS_HEADER *>(header);
+	IMAGE_NT_HEADERS *ntHeader = reinterpret_cast<IMAGE_NT_HEADERS *>(header + dosHeader->e_lfanew);
+	if(ntHeader->OptionalHeader.Subsystem != IMAGE_SUBSYSTEM_WINDOWS_CUI)
+		return false;
+
 	uint8_t *targetCodeBase = reinterpret_cast<uint8_t *>(VirtualAllocEx(processHandle, nullptr, 0x10000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READ));
 #ifdef _WIN64
 	if(!WriteProcessMemory(processHandle, targetCodeBase, reinterpret_cast<LPCVOID>(stubData64), sizeof(stubData64), nullptr))
@@ -229,6 +249,7 @@ void Patcher::patchProcess(void *processHandle)
 		throw std::exception("WriteProcessMemory failed");
 	patch<TargetData32>(processHandle, &patchData, targetCodeBase);
 #endif
+	return true;
 }
 
 void Patcher::initPatch()
@@ -246,6 +267,8 @@ void Patcher::initPatch()
 	patchData.ntConnectPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtConnectPort"));
 	patchData.ntSecureConnectPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtSecureConnectPort"));
 	patchData.ntRequestWaitReplyPort = reinterpret_cast<size_t>(GetProcAddress(ntdllBase, "NtRequestWaitReplyPort"));
+
+	NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcessType>(GetProcAddress(ntdllBase, "NtQueryInformationProcess"));
 	
 #ifdef _WIN64
 	patchData.syscallSize = 11; //mov r10, rcx; mov eax, <syscallno>; syscall; retn

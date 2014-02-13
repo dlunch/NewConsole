@@ -64,6 +64,6 @@ public:
 	static void initialize();
 	static void registerConsoleHost(ConsoleHost *host);
 	static void unRegisterConsoleHost(ConsoleHost *host);
-	static void patchProcess(void *processHandle);
+	static bool patchProcess(void *processHandle);
 	static ConsoleHost *findConsoleHostByPid(uint32_t pid);
 };

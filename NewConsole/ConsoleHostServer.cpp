@@ -103,10 +103,10 @@ void ConsoleHostServer::unRegisterConsoleHost(ConsoleHost *host)
 	consoleHostServerData_->waitingHosts.remove(host);
 }
 
-void ConsoleHostServer::patchProcess(void *processHandle)
+bool ConsoleHostServer::patchProcess(void *processHandle)
 {
 	AssignProcessToJobObject(consoleHostServerData_->jobObject, processHandle);
-	Patcher::patchProcess(processHandle);
+	return Patcher::patchProcess(processHandle);
 }
 
 ConsoleHost *ConsoleHostServer::findConsoleHostByPid(uint32_t pid)

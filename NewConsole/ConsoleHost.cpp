@@ -13,52 +13,58 @@
 const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0xb, 0x4c, 0x23, 0x3c, 0x25};
 const uint16_t *g_csrssAPITable;
 
-ConsoleHost::ConsoleHost(const std::wstring &cmdline, ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0)
+ConsoleHost::ConsoleHost(void *childProcess, ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0), childProcess_(childProcess), active_(false)
 {
-	try
+	childProcessId_ = GetProcessId(childProcess);
+	setDefaultMode();
+	ConsoleHostServer::registerConsoleHost(this);
+}
+
+ConsoleHost::ConsoleHost(ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0), active_(false)
+{	
+	if(!g_csrssAPITable)
 	{
-		if(!g_csrssAPITable)
-		{
 #ifdef _WIN64
-			PEB64 *peb = reinterpret_cast<PEB64 *>(__readgsqword(0x60));
+		PEB64 *peb = reinterpret_cast<PEB64 *>(__readgsqword(0x60));
 #elif defined(_WIN32)
-			PEB32 *peb = reinterpret_cast<PEB32 *>(__readfsdword(0x30));
+		PEB32 *peb = reinterpret_cast<PEB32 *>(__readfsdword(0x30));
 #endif
-			if(peb->OSMajorVersion == 6 && peb->OSMinorVersion == 1)
-				g_csrssAPITable = g_csrssAPITableWin7;
-		}
-
-		ConsoleHostServer::registerConsoleHost(this);
-		
-		STARTUPINFO si;
-		PROCESS_INFORMATION pi;
-
-		ZeroMemory(&si, sizeof(si));
-		si.cb = sizeof(si);
-		si.dwFlags = STARTF_FORCEOFFFEEDBACK;
-
-		CreateProcess(nullptr, const_cast<wchar_t *>(cmdline.c_str()), nullptr, nullptr, TRUE, CREATE_SUSPENDED, nullptr, nullptr, &si, &pi);
-		childProcess_ = pi.hProcess;
-		childProcessId_ = pi.dwProcessId;
-
-		ConsoleHostServer::patchProcess(pi.hProcess);
-
-		ResumeThread(pi.hThread);
-		CloseHandle(pi.hThread);
-
-		//default mode
-		inputMode_ = ENABLE_ECHO_INPUT | ENABLE_EXTENDED_FLAGS | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_MOUSE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE;
-		outputMode_ = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT;
+		if(peb->OSMajorVersion == 6 && peb->OSMinorVersion == 1)
+			g_csrssAPITable = g_csrssAPITableWin7;
 	}
-	catch(...)
-	{
-		cleanup();
-		throw;
-	}
+	setDefaultMode();
+	ConsoleHostServer::registerConsoleHost(this);
+}
+
+void ConsoleHost::setDefaultMode()
+{
+	inputMode_ = ENABLE_ECHO_INPUT | ENABLE_EXTENDED_FLAGS | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_MOUSE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE;
+	outputMode_ = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT;
+}
+
+void ConsoleHost::startProcess(const std::wstring &cmdline)
+{
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_FORCEOFFFEEDBACK;
+
+	CreateProcess(nullptr, const_cast<wchar_t *>(cmdline.c_str()), nullptr, nullptr, TRUE, CREATE_SUSPENDED, nullptr, nullptr, &si, &pi);
+	childProcess_ = pi.hProcess;
+	childProcessId_ = pi.dwProcessId;
+
+	ConsoleHostServer::patchProcess(pi.hProcess);
+
+	ResumeThread(pi.hThread);
+	CloseHandle(pi.hThread);
 }
 
 void ConsoleHost::cleanup()
 {
+	childHost_.reset();
+
 	ConsoleHostServer::unRegisterConsoleHost(this);
 	TerminateProcess(childProcess_, 0);
 	CloseHandle(childProcess_);
@@ -149,6 +155,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			serverHandles_.push_back(response.fakeHandle);
 		else if(!wcsncmp(fileName, L"\\Connect", 8))
 		{
+			active_ = true;
 			serverHandles_.push_back(response.fakeHandle);
 			void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
 			//TODO
@@ -272,7 +279,11 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 	{
 		HandleCreateUserProcessRequest *request = reinterpret_cast<HandleCreateUserProcessRequest *>(data);
 
-		ConsoleHostServer::patchProcess(request->processHandle);
+		if(ConsoleHostServer::patchProcess(request->processHandle))
+		{
+			childHost_.reset(new ConsoleHost(request->processHandle, listener_));
+			listener_->setActiveHost(childHost_);
+		}
 		
 		connection_->sendPacketHeader(HandleCreateUserProcess, 0);
 	}
@@ -400,6 +411,7 @@ void ConsoleHost::handlePacket(uint16_t op, uint32_t size, uint8_t *data)
 			}
 			else if(apiNumber == 0x53) //only in windows 7. ConsoleClientConnect
 			{
+				active_ = true;
 				std::vector<uint8_t> buffer = readCSRSSCaptureData(messageHeader);
 
 				CSRSSConsoleClientConnectData *connectData = reinterpret_cast<CSRSSConsoleClientConnectData *>(
