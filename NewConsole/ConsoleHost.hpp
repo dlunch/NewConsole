@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 #include <vector>
+#include <queue>
 
 #ifdef _WIN64
 typedef int64_t ssize_t;
@@ -16,6 +17,15 @@ class ConsoleEventListener;
 class ConsoleHostConnection;
 struct CSRSSLPCMessageHeader;
 struct GetConsoleScreenBufferInfoExResponse;
+
+struct ConsoleReadOperation
+{
+	size_t size;
+	std::function<void (const uint8_t *, size_t, size_t, void *)> completionHandler;
+	bool isWideChar;
+	void *userData;
+};
+
 class ConsoleHost
 {
 	friend class ConsoleHostServer;
@@ -31,14 +41,13 @@ private:
 	std::list<void *> outputHandles_;
 	std::list<void *> serverHandles_;
 	ssize_t csrssMemoryDiff_;
-	std::wstring inputBuffer_;
 
-	std::list<std::tuple<size_t, std::function<void (const uint8_t *, size_t, size_t, void *)>, bool, void *>> queuedReadOperations_;
+	std::queue<ConsoleReadOperation> queuedReadOperations_;
 
 	void *newFakeHandle();
 	void cleanup();
-	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWideChar, void *userData);
-	void checkQueuedRead();
+	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completionHandler, bool isWideChar, void *userData);
+	void checkQueuedRead(const std::wstring &buffer);
 	void handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideChar);
 	bool isInputHandle(void *handle);
 	bool isOutputHandle(void *handle);

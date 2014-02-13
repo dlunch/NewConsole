@@ -486,44 +486,39 @@ void ConsoleHost::handleDisconnected()
 
 void ConsoleHost::write(const std::wstring &buffer)
 {
-	inputBuffer_ += buffer;
-	checkQueuedRead();
-}
+	if(!queuedReadOperations_.size())
+		return;
 
-void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completion, bool isWideChar, void *userData)
-{
-	queuedReadOperations_.push_back(std::make_tuple(size, completion, isWideChar, userData));
-	checkQueuedRead();
-}
+	auto i = queuedReadOperations_.front();
 
-void ConsoleHost::checkQueuedRead()
-{
-	if(!inputBuffer_.size())
-	   return;
-	while(queuedReadOperations_.size())
+	if(i.isWideChar == false)
 	{
-		auto &i = queuedReadOperations_.front();
-		if(inputMode_ & ENABLE_LINE_INPUT) //input is given line by line on line input mode.
-		{
-			if(std::get<2>(i) == false)
-			{
-				char *buf;
-				int len;
+		char *buf;
+		int len;
 
-				len = WideCharToMultiByte(CP_UTF8, 0, inputBuffer_.c_str(), -1, nullptr, 0, 0, 0);
-				buf = new char[len];
-				WideCharToMultiByte(CP_UTF8, 0, inputBuffer_.c_str(), -1, buf, len, 0, 0);
-				buf[len - 1] = 0;
+		len = WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, nullptr, 0, 0, 0);
+		buf = new char[len];
+		WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, buf, len, 0, 0);
+		buf[len - 1] = 0;
 
-				std::get<1>(i)(reinterpret_cast<const uint8_t *>(buf), len, len - 1, std::get<3>(i));
-				delete [] buf;
-			}
-			else
-				std::get<1>(i)(reinterpret_cast<const uint8_t *>(inputBuffer_.c_str()), inputBuffer_.size() * 2, inputBuffer_.size() - 1, std::get<3>(i));
-			inputBuffer_.clear();
-			queuedReadOperations_.pop_front();
-		}
+		i.completionHandler(reinterpret_cast<const uint8_t *>(buf), len, len - 1, i.userData);
+		delete[] buf;
 	}
+	else
+		i.completionHandler(reinterpret_cast<const uint8_t *>(buffer.c_str()), buffer.size() * 2, buffer.size() - 1, i.userData);
+	queuedReadOperations_.pop();
+}
+
+void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completionHandler, bool isWideChar, void *userData)
+{
+	ConsoleReadOperation operation;
+	operation.size = size;
+	operation.completionHandler = completionHandler;
+	operation.isWideChar = isWideChar;
+	operation.userData = userData;
+	queuedReadOperations_.push(operation);
+
+	listener_->handleRead(size);
 }
 
 void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideChar)

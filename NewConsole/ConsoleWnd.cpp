@@ -3,13 +3,17 @@
 #include "ConsoleHost.hpp"
 #include "NewConsole.hpp"
 
+#undef min
+#undef max
+
 ITfThreadMgr *ConsoleWnd::tsfThreadMgr_;
 TfClientId ConsoleWnd::tsfClientId_;
 
 ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd) : 
 	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1),
 	tsfDocumentMgr_(nullptr), tsfContext_(nullptr), tsfACPSink_(nullptr), 
-	selStart_(0), selEnd_(0), isSelectionInterim_(false), isSelectionEndsAtLeft_(false)
+	selStart_(0), selEnd_(0), isSelectionInterim_(false), isSelectionEndsAtLeft_(false),
+	currentReadSize_(0)
 {
 	if(!tsfThreadMgr_)
 	{
@@ -185,61 +189,72 @@ bool ConsoleWnd::onKeyDown(int vk)
 	return false;
 }
 
-bool ConsoleWnd::appendInputBuffer(const std::wstring &buffer)
+void ConsoleWnd::checkPendingRead()
 {
+	if(!currentReadSize_)
+		return;
 	if(!(host_->getInputMode() & ENABLE_LINE_INPUT))
 	{
-		host_->write(buffer);
-		return true;
+		size_t size = std::min(currentReadSize_, inputBuffer_.size());
+		host_->write(inputBuffer_.substr(0, size));
+		inputBuffer_.erase(0, size);
 	}
-	bool hasSelection = false;
-	if(selStart_ != selEnd_)
+	else
 	{
-		hasSelection = true;
-		inputBuffer_.erase(selStart_, selStart_ - selEnd_ + 1);
-	}
-	inputBuffer_.insert(selEnd_, buffer);
-	selEnd_ += buffer.size();
-	selStart_ = selEnd_;
-
-	if(buffer.find(L'\b') != std::wstring::npos) //backspace
-	{
-		if(inputBuffer_.size() == 1)
+		size_t pos;
+		if((pos = inputBuffer_.find(L'\n')) != std::wstring::npos)
 		{
-			selStart_ = selEnd_ = 0;
-			inputBuffer_.clear();
-			return false;
-		}
-		size_t pos = inputBuffer_.find(L'\b');
-		while(pos != std::wstring::npos)
-		{
-			inputBuffer_.erase(pos - 1, (hasSelection ? 1 : 2));
-			selStart_ = selEnd_ = pos - 1;
-			pos = inputBuffer_.find(L'\b');
-		}
-	}
-
-	if(buffer.find(L'\n') != std::wstring::npos)
-	{
-		size_t end = inputBuffer_.find(L'\n');
-		size_t start = 0;
-		while(end != std::wstring::npos)
-		{
-			std::wstring buffer(inputBuffer_.begin() + start, inputBuffer_.begin() + end);
-			inputBuffer_.erase(inputBuffer_.begin() + start, inputBuffer_.begin() + end + 1);
-
-			selStart_ = selEnd_ = inputBuffer_.size();
-			isSelectionInterim_ = false;
-			isSelectionEndsAtLeft_ = false;
-
-			buffer.append(L"\r\n");
+			pos ++;
+			std::wstring buffer = inputBuffer_.substr(0, pos);
+			buffer.replace(buffer.end() - 1, buffer.end(), L"\r\n");
 			host_->write(buffer);
-			appendStringToBuffer(buffer);
-
-			start = end + 1;
-			end = inputBuffer_.find(L'\n', start);
+			inputBuffer_.erase(0, pos);
 		}
 	}
+}
+
+void ConsoleWnd::handleRead(size_t size)
+{
+	currentReadSize_ = size;
+	checkPendingRead();
+}
+
+bool ConsoleWnd::appendCharacter(const std::wstring &buffer)
+{
+	if(buffer.size() == 0)
+		return false;
+
+	if(!(host_->getInputMode() & ENABLE_LINE_INPUT))
+		inputBuffer_ = buffer;
+	else
+	{
+		bool hasSelection = false;
+		if(selStart_ != selEnd_)
+		{
+			inputBuffer_.erase(selStart_, selStart_ - selEnd_ + 1);
+			selEnd_ = selStart_;
+		}
+
+		if(buffer[0] == L'\b' && buffer.size() == 1) //backspace
+		{
+			if(selStart_ == 0)
+				return false;
+			if(!hasSelection)
+			{
+				inputBuffer_.erase(selStart_ - 1, 1);
+				selStart_ = selEnd_ = selStart_ - 1;
+			}
+		}
+		else
+		{
+			inputBuffer_.insert(selEnd_, buffer);
+			selEnd_ += buffer.size();
+			selStart_ = selEnd_;
+		}
+	}
+
+	checkPendingRead();
+
 	if(host_->getInputMode() & ENABLE_ECHO_INPUT)
 		inputBufferUpdated();
 	return true;

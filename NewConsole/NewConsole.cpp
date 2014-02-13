@@ -149,7 +149,7 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 				temp.resize(len);
 				if(temp[0] == L'\r' && len == 1)
 					temp[0] = L'\n';
-				activeConsole_.lock()->appendInputBuffer(temp);
+				activeConsole_.lock()->appendCharacter(temp);
 			}
 			else
 				activeConsole_.lock()->onKeyDown(static_cast<int>(wParam));

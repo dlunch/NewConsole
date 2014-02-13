@@ -35,13 +35,16 @@ private:
 	size_t selEnd_;
 	bool isSelectionInterim_;
 	bool isSelectionEndsAtLeft_;
+	size_t currentReadSize_;
 
 	std::wstring inputBuffer_;
 	std::list<std::pair<std::wstring, float>> buffer_;
 	std::mutex bufferLock_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
+	virtual void handleRead(size_t size);
 	virtual void handleWrite(const std::wstring &buffer);
+	void checkPendingRead();
 	void updateCache(int width, int height, int scrollx, int scrolly);
 	void invalidateCache();
 	void bufferUpdated();
@@ -52,7 +55,7 @@ public:
 	~ConsoleWnd();
 
 	void drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly);
-	bool appendInputBuffer(const std::wstring &buffer);
+	bool appendCharacter(const std::wstring &buffer);
 	bool onKeyDown(int vk);
 	void activated();
 
