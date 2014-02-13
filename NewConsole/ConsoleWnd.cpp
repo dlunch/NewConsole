@@ -161,7 +161,9 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 
 bool ConsoleWnd::onKeyDown(int vk)
 {
-	if(vk == VK_LEFT)
+	if(vk == VK_DELETE)	
+		deleteOrBackspace(false);
+	else if(vk == VK_LEFT)
 	{
 		if(selStart_ != selEnd_)
 			selStart_ = selEnd_;
@@ -187,6 +189,31 @@ bool ConsoleWnd::onKeyDown(int vk)
 		return false;
 
 	return false;
+}
+
+bool ConsoleWnd::deleteOrBackspace(bool isBackspace)
+{
+	if(isBackspace && selStart_ == 0)
+		return false;
+	if(!isBackspace && selEnd_ == inputBuffer_.size())
+		return false;
+	if(selStart_ != selEnd_)
+	{
+		inputBuffer_.erase(selStart_, selStart_ - selEnd_ + 1);
+		selEnd_ = selStart_;
+	}
+	else
+	{
+		size_t pos = selStart_ - 1;
+		if(!isBackspace)
+			pos ++;
+		inputBuffer_.erase(pos, 1);
+		selStart_ = selEnd_ = pos;
+	}
+
+	if(host_->getInputMode() & ENABLE_ECHO_INPUT)
+		inputBufferUpdated();
+	return true;
 }
 
 void ConsoleWnd::checkPendingRead()
@@ -228,25 +255,15 @@ bool ConsoleWnd::appendCharacter(const std::wstring &buffer)
 		inputBuffer_.append(buffer);
 	else
 	{
-		bool hasSelection = false;
-		if(selStart_ != selEnd_)
-		{
-			inputBuffer_.erase(selStart_, selStart_ - selEnd_ + 1);
-			selEnd_ = selStart_;
-		}
-
 		if(buffer[0] == L'\b' && buffer.size() == 1) //backspace
-		{
-			if(selStart_ == 0)
-				return false;
-			if(!hasSelection)
-			{
-				inputBuffer_.erase(selStart_ - 1, 1);
-				selStart_ = selEnd_ = selStart_ - 1;
-			}
-		}
+			return deleteOrBackspace(true);
 		else
 		{
+			if(selStart_ != selEnd_)
+			{
+				inputBuffer_.erase(selStart_, selStart_ - selEnd_ + 1);
+				selEnd_ = selStart_;
+			}
 			inputBuffer_.insert(selEnd_, buffer);
 			selEnd_ += buffer.size();
 			selStart_ = selEnd_;

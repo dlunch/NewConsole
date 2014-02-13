@@ -44,6 +44,8 @@ private:
 private:
 	virtual void handleRead(size_t size);
 	virtual void handleWrite(const std::wstring &buffer);
+
+	bool deleteOrBackspace(bool isBackspace);
 	void checkPendingRead();
 	void updateCache(int width, int height, int scrollx, int scrolly);
 	void invalidateCache();
