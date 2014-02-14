@@ -147,9 +147,9 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 		lstrcpyn(fileName, reinterpret_cast<LPCWSTR>(data + sizeof(HandleCreateFileRequest)), request->fileNameLen); //eabuffer follows.
 		fileName[request->fileNameLen / 2] = 0;
 
-		if(!wcsncmp(fileName, L"\\Input", 6))
+		if(!wcsncmp(fileName, L"\\Input", 6) || !wcsncmp(fileName, L"\\??\\CONIN$", 10))
 			inputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
-		else if(!wcsncmp(fileName, L"\\Output", 7))
+		else if(!wcsncmp(fileName, L"\\Output", 7) || !wcsncmp(fileName, L"\\??\\CONOUT$", 11))
 			outputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
 		else if(!wcsncmp(fileName, L"\\Device\\ConDrv", 14) || !wcsncmp(fileName, L"\\Reference", 10))
 			serverHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));

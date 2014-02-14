@@ -217,26 +217,29 @@ uint32_t __stdcall HookedNtCreateFile(TargetData *targetData, void **FileHandle,
 {
 	if(!targetData->initialized)
 		initialize(targetData);
-	if(ObjectAttributes && ObjectAttributes->ObjectName && FileHandle &&
-	   ObjectAttributes->ObjectName->Length > 4 && ObjectAttributes->ObjectName->Buffer[1] != L'?')
+	if(ObjectAttributes && ObjectAttributes->ObjectName && FileHandle && ObjectAttributes->ObjectName->Length > 5)
 	{
-		HandleCreateFileRequest request;
-		HandleCreateFileResponse response;
-		request.fileNameLen = ObjectAttributes->ObjectName->Length;
-		sendPacketHeader(targetData, HandleCreateFile, static_cast<uint32_t>(sizeof(HandleCreateFileRequest) + ObjectAttributes->ObjectName->Length + EaLength));
-		sendPacketData(targetData, &request, sizeof(request));
-		sendPacketData(targetData, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length);
-		if(EaLength)
-			sendPacketData(targetData, EaBuffer, EaLength);
-
-		recvPacket(targetData, &response);
-
-		if(response.returnFake)
+		if(ObjectAttributes->ObjectName->Buffer[1] != L'?' ||  //\\{Connect/Reference/~~} or \\??\\CON{IN/OUT}
+		   (ObjectAttributes->ObjectName->Buffer[4] == L'C' && ObjectAttributes->ObjectName->Buffer[5] == L'O'))
 		{
-			*FileHandle = reinterpret_cast<void *>(response.fakeHandle);
-			IoStatusBlock->Information = reinterpret_cast<uint32_t *>(FILE_OPENED);
-			IoStatusBlock->Status = 0;
-			return 0;
+			HandleCreateFileRequest request;
+			HandleCreateFileResponse response;
+			request.fileNameLen = ObjectAttributes->ObjectName->Length;
+			sendPacketHeader(targetData, HandleCreateFile, static_cast<uint32_t>(sizeof(HandleCreateFileRequest) + ObjectAttributes->ObjectName->Length + EaLength));
+			sendPacketData(targetData, &request, sizeof(request));
+			sendPacketData(targetData, ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length);
+			if(EaLength)
+				sendPacketData(targetData, EaBuffer, EaLength);
+
+			recvPacket(targetData, &response);
+
+			if(response.returnFake)
+			{
+				*FileHandle = reinterpret_cast<void *>(response.fakeHandle);
+				IoStatusBlock->Information = reinterpret_cast<uint32_t *>(FILE_OPENED);
+				IoStatusBlock->Status = 0;
+				return 0;
+			}
 		}
 	}
 	
