@@ -39,8 +39,8 @@ struct HandleCreateFileRequest
 
 struct HandleCreateFileResponse
 {
-	uint8_t returnFake;
-	void *fakeHandle;
+	uint32_t returnFake;
+	uint64_t fakeHandle;
 };
 
 struct HandleReadFileRequest
@@ -55,7 +55,7 @@ struct HandleWriteFileResponse
 
 struct HandleDeviceIoControlFileRequest
 {
-	void *handle;
+	uint64_t handle;
 	uint32_t code;
 	//data follows
 };
@@ -63,33 +63,33 @@ struct HandleDeviceIoControlFileRequest
 //this method will be sent after proecss creation.
 struct HandleCreateUserProcessRequest
 {
-	void *processHandle;
+	uint64_t processHandle;
 };
 
 struct HandleLPCMessageRequest
 {
-	void *requestPointer;
+	uint64_t requestPointer;
 };
 
 struct HandleLPCMessageResponse
 {
-	uint8_t callOriginal;
+	uint32_t callOriginal;
 };
 
 struct HandleDuplicateObjectRequest
 {
-	void *handle;
+	uint64_t handle;
 };
 
 struct HandleDuplicateObjectResponse
 {
-	void *fakeHandle;
+	uint64_t fakeHandle;
 };
 
 struct LPCConnectRequest
 {
-	size_t serverBase;
-	size_t clientBase;
+	uint64_t serverBase;
+	uint64_t clientBase;
 };
 
 #pragma pack(pop)

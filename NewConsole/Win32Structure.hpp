@@ -604,7 +604,7 @@ typedef struct _PEB32
 	int8_t BeingDebugged;
 	int8_t Spare;
 	uint32_t Mutant;
-	uint32_t ImageBaseAddress;
+	void *ImageBaseAddress;
 	PPEB_LDR_DATA LoaderData;
 	PRTL_USER_PROCESS_PARAMETERS ProcessParameters;
 	uint32_t SubSystemData;
@@ -663,7 +663,7 @@ typedef struct _PEB64
 	int8_t BeingDebugged;
 	int8_t Spare;
 	uint64_t Mutant;
-	uint64_t ImageBaseAddress;
+	void *ImageBaseAddress;
 	PPEB_LDR_DATA LoaderData;
 	PRTL_USER_PROCESS_PARAMETERS ProcessParameters;
 	uint64_t SubSystemData;

@@ -141,21 +141,21 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 		HandleCreateFileRequest *request = reinterpret_cast<HandleCreateFileRequest *>(data);
 		HandleCreateFileResponse response;
 		response.returnFake = 1;
-		response.fakeHandle = newFakeHandle();
+		response.fakeHandle = reinterpret_cast<uint64_t>(newFakeHandle());
 
 		wchar_t fileName[255];
 		lstrcpyn(fileName, reinterpret_cast<LPCWSTR>(data + sizeof(HandleCreateFileRequest)), request->fileNameLen); //eabuffer follows.
 		fileName[request->fileNameLen / 2] = 0;
 
 		if(!wcsncmp(fileName, L"\\Input", 6))
-			inputHandles_.push_back(response.fakeHandle);
+			inputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
 		else if(!wcsncmp(fileName, L"\\Output", 7))
-			outputHandles_.push_back(response.fakeHandle);
+			outputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
 		else if(!wcsncmp(fileName, L"\\Device\\ConDrv", 14) || !wcsncmp(fileName, L"\\Reference", 10))
-			serverHandles_.push_back(response.fakeHandle);
+			serverHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
 		else if(!wcsncmp(fileName, L"\\Connect", 8))
 		{
-			serverHandles_.push_back(response.fakeHandle);
+			serverHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
 			void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
 			//TODO
 		}
@@ -280,9 +280,9 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 	{
 		HandleCreateUserProcessRequest *request = reinterpret_cast<HandleCreateUserProcessRequest *>(data);
 
-		if(ConsoleHostServer::patchProcess(request->processHandle))
+		if(ConsoleHostServer::patchProcess(reinterpret_cast<void *>(request->processHandle)))
 		{
-			childProcesses_.push_back(request->processHandle);
+			childProcesses_.push_back(reinterpret_cast<void *>(request->processHandle));
 			ConsoleHostServer::registerConsoleHost(this);
 		}
 		
@@ -334,7 +334,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 				CSRSSReadLambdaData *userData = new CSRSSReadLambdaData;
 				userData->messageBuf.assign(data, data + size);
 				userData->captureBuffer = readCSRSSCaptureData(connection, messageHeader);
-				userData->requestPointer = request->requestPointer;
+				userData->requestPointer = reinterpret_cast<void *>(request->requestPointer);
 				userData->connection = connection;
 
 				CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
@@ -371,7 +371,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 				else
 				{
 					std::vector<uint8_t> buffer = readCSRSSCaptureData(connection, messageHeader);
-					uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(connection, messageHeader, request->requestPointer, buffer, 0));
+					uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(connection, messageHeader, reinterpret_cast<void *>(request->requestPointer), buffer, 0));
 					handleWrite(data, writeData->dataSize, writeData->isWideChar == 1);
 				}
 				messageHeader->Status = 0;
@@ -418,7 +418,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 				std::vector<uint8_t> buffer = readCSRSSCaptureData(connection, messageHeader);
 
 				CSRSSConsoleClientConnectData *connectData = reinterpret_cast<CSRSSConsoleClientConnectData *>(
-					getCSRSSCaptureBuffer(connection, messageHeader, request->requestPointer, buffer, 0));
+					getCSRSSCaptureBuffer(connection, messageHeader, reinterpret_cast<void *>(request->requestPointer), buffer, 0));
 
 				connectData->consoleHandle = newFakeHandle();
 				connectData->inputHandle = newFakeHandle();
@@ -447,7 +447,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 	else if(op == HandleLPCConnect)
 	{
 		LPCConnectRequest *request = reinterpret_cast<LPCConnectRequest *>(data);
-		csrssMemoryDiff_ = -static_cast<long long>(request->serverBase) + static_cast<long long>(request->clientBase);
+		csrssMemoryDiff_ = -static_cast<ssize_t>(request->serverBase) + static_cast<ssize_t>(request->clientBase);
 		connection->sendPacketHeader(HandleLPCConnect, 0);
 	}
 	else if(op == HandleDuplicateObject)
@@ -455,12 +455,12 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 		HandleDuplicateObjectRequest *request = reinterpret_cast<HandleDuplicateObjectRequest *>(data);
 
 		HandleDuplicateObjectResponse response;
-		response.fakeHandle = newFakeHandle();
+		response.fakeHandle = reinterpret_cast<uint64_t>(newFakeHandle());
 
-		if(isOutputHandle(request->handle))
-			outputHandles_.push_back(response.fakeHandle);
-		else if(isInputHandle(request->handle))
-			inputHandles_.push_back(response.fakeHandle);
+		if(isOutputHandle(reinterpret_cast<void *>(request->handle)))
+			outputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
+		else if(isInputHandle(reinterpret_cast<void *>(request->handle)))
+			inputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
 
 		connection->sendPacket(HandleDuplicateObject, &response);
 	}
@@ -542,9 +542,9 @@ void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideCha
 	if(!isWideChar)
 	{
 		//input is unicode
-		int size = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize / 2), nullptr, 0);
+		int size = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize), nullptr, 0);
 		stringBuf.resize(size);
-		MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize / 2), reinterpret_cast<LPTSTR>(&stringBuf[0]), size);
+		MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize), reinterpret_cast<LPTSTR>(&stringBuf[0]), size);
 	}
 	else
 		stringBuf.assign(reinterpret_cast<wchar_t *>(buffer), reinterpret_cast<wchar_t *>(buffer) + bufferSize / 2);

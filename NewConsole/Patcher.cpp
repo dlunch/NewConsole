@@ -85,6 +85,38 @@ struct PatchData
 };
 
 PatchData patchData;
+#ifdef _WIN64
+struct PatchData32
+{
+	uint32_t ntdllBase;
+	uint32_t syscallSize;
+
+	uint32_t ntCreateFile;
+	uint32_t ntWriteFile;
+	uint32_t ntReadFile;
+	uint32_t ntDeviceIoControlFile;
+	uint32_t ntQueryVolumeInformationFile;
+	uint32_t ntCreateUserProcess;
+	uint32_t ntDuplicateObject;
+	uint32_t ntClose;
+	uint32_t ntConnectPort;
+	uint32_t ntSecureConnectPort;
+	uint32_t ntRequestWaitReplyPort;
+
+	uint32_t HookedNtCreateFile;
+	uint32_t HookedNtReadFile;
+	uint32_t HookedNtWriteFile;
+	uint32_t HookedNtDeviceIoControlFile;
+	uint32_t HookedNtQueryVolumeInformationFile;
+	uint32_t HookedNtCreateUserProcess;
+	uint32_t HookedNtDuplicateObject;
+	uint32_t HookedNtClose;
+	uint32_t HookedNtConnectPort;
+	uint32_t HookedNtSecureConnectPort;
+	uint32_t HookedNtRequestWaitReplyPort;
+};
+PatchData32 patchData32;
+#endif
 
 template<int WordSize>
 void createTrampoline(uint8_t *dst, size_t functionAddr, size_t targetData)
@@ -152,8 +184,8 @@ WordType addHook(HANDLE processHandle, uint8_t *trampolineBase, size_t newFuncti
 	return originalAddress;
 }
 
-template<typename TargetDataType>
-void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
+template<typename TargetDataType, typename PatchDataType>
+void patch(HANDLE processHandle, PatchDataType *patchData, uint8_t *targetCodeBase)
 {
 	TargetDataType targetData;
 
@@ -221,9 +253,17 @@ void patch(HANDLE processHandle, PatchData *patchData, uint8_t *targetCodeBase)
 	delete [] trampolineData;
 }
 
-bool Patcher::patchProcess(void *processHandle)
+struct ProcessInfo
 {
-	//check subsystem
+	bool is32;
+	bool isCUI;
+	void *imageBase;
+};
+
+ProcessInfo getProcessInfo(void *processHandle)
+{
+	ProcessInfo result;
+
 	PROCESS_BASIC_INFORMATION pbi;
 	NtQueryInformationProcess(processHandle, 0, &pbi, sizeof(pbi), nullptr);
 	uint8_t header[0x1000];
@@ -233,17 +273,120 @@ bool Patcher::patchProcess(void *processHandle)
 	PEB32 peb;
 #endif
 	ReadProcessMemory(processHandle, pbi.PebBaseAddress, &peb, sizeof(peb), nullptr);
-	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(peb.ImageBaseAddress), header, sizeof(header), nullptr);
+	ReadProcessMemory(processHandle, peb.ImageBaseAddress, header, sizeof(header), nullptr);
 	IMAGE_DOS_HEADER *dosHeader = reinterpret_cast<IMAGE_DOS_HEADER *>(header);
 	IMAGE_NT_HEADERS *ntHeader = reinterpret_cast<IMAGE_NT_HEADERS *>(header + dosHeader->e_lfanew);
-	if(ntHeader->OptionalHeader.Subsystem != IMAGE_SUBSYSTEM_WINDOWS_CUI)
-		return false;
+
+	if(ntHeader->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+	{
+		result.isCUI = (ntHeader->OptionalHeader.Subsystem == IMAGE_SUBSYSTEM_WINDOWS_CUI);
+		result.is32 = false;
+	}
+	else
+	{
+		IMAGE_NT_HEADERS32 *ntHeader32 = reinterpret_cast<IMAGE_NT_HEADERS32 *>(header + dosHeader->e_lfanew);
+
+		result.isCUI = (ntHeader32->OptionalHeader.Subsystem == IMAGE_SUBSYSTEM_WINDOWS_CUI);
+		result.is32 = true;
+	}
+
+	result.imageBase = peb.ImageBaseAddress;
+	return result;
+}
+
+#ifdef _WIN64
+void initPatchData32FromProcess(void *processHandle, void *imageBase)
+{
+	//get ntdll base 
+	MEMORY_BASIC_INFORMATION mbi;
+	VirtualQueryEx(processHandle, nullptr, &mbi, sizeof(mbi));
+	size_t address = 0;
+	while(true)
+	{
+		if(mbi.AllocationBase != imageBase && mbi.Type == SEC_IMAGE) //only ntdll and image is loaded on startup.
+		{
+			patchData32.ntdllBase = reinterpret_cast<uint32_t>(mbi.BaseAddress);
+			break;
+		}
+		address += mbi.RegionSize;
+		SIZE_T result = VirtualQueryEx(processHandle, reinterpret_cast<LPCVOID>(address), &mbi, sizeof(mbi));
+		if(!result)
+			break;
+	}
+
+	//get function address
+	uint8_t header[0x1000];
+	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(patchData32.ntdllBase), header, sizeof(header), nullptr);
+	IMAGE_DOS_HEADER *dosHeader = reinterpret_cast<IMAGE_DOS_HEADER *>(header);
+	IMAGE_NT_HEADERS32 *ntHeader = reinterpret_cast<IMAGE_NT_HEADERS32 *>(header + dosHeader->e_lfanew);
+
+	uint8_t *data = new uint8_t[ntHeader->OptionalHeader.SizeOfImage];
+	ReadProcessMemory(processHandle, reinterpret_cast<LPCVOID>(patchData32.ntdllBase), data, ntHeader->OptionalHeader.SizeOfImage, nullptr);
+
+	size_t exportBase = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+	IMAGE_EXPORT_DIRECTORY *directory = reinterpret_cast<IMAGE_EXPORT_DIRECTORY *>(data + exportBase);
+
+	uint32_t *addressOfFunctions = reinterpret_cast<uint32_t *>(data + directory->AddressOfFunctions);
+	uint32_t *addressOfNames = reinterpret_cast<uint32_t *>(data + directory->AddressOfNames);
+	uint16_t *ordinals = reinterpret_cast<uint16_t *>(data + directory->AddressOfNameOrdinals);
+
+	for(size_t i = 0; i < directory->NumberOfNames; i ++)
+	{
+		if(addressOfNames && addressOfNames[i])
+		{
+			const char *name = reinterpret_cast<const char *>(data + addressOfNames[i]);
+			uint32_t address = addressOfFunctions[ordinals[i]];
+
+			if(!strcmp(name, "NtCreateFile"))
+				patchData32.ntCreateFile = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtWriteFile"))
+				patchData32.ntWriteFile = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtReadFile"))
+				patchData32.ntReadFile = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtDeviceIoControlFile"))
+				patchData32.ntDeviceIoControlFile = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtQueryVolumeInformationFile"))
+				patchData32.ntQueryVolumeInformationFile = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtCreateUserProcess"))
+				patchData32.ntCreateUserProcess = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtDuplicateObject"))
+				patchData32.ntDuplicateObject = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtClose"))
+				patchData32.ntClose = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtConnectPort"))
+				patchData32.ntConnectPort = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtSecureConnectPort"))
+				patchData32.ntSecureConnectPort = address + patchData32.ntdllBase;
+			else if(!strcmp(name, "NtRequestWaitReplyPort"))
+				patchData32.ntRequestWaitReplyPort = address + patchData32.ntdllBase;
+		}
+	}
+
+	delete [] data;
+}
+#endif
+bool Patcher::patchProcess(void *processHandle)
+{
+	ProcessInfo info = getProcessInfo(processHandle);
+	if(!info.isCUI)
+		return false; //is a gui process
 
 	uint8_t *targetCodeBase = reinterpret_cast<uint8_t *>(VirtualAllocEx(processHandle, nullptr, 0x10000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READ));
 #ifdef _WIN64
 	if(!WriteProcessMemory(processHandle, targetCodeBase, reinterpret_cast<LPCVOID>(stubData64), sizeof(stubData64), nullptr))
 		throw std::exception("WriteProcessMemory failed");
 	patch<TargetData64>(processHandle, &patchData, targetCodeBase);
+
+	//patch wow32 part
+	if(info.is32)
+	{
+		if(!patchData32.ntdllBase)
+			initPatchData32FromProcess(processHandle, info.imageBase);
+		uint8_t *targetCodeBase32 = reinterpret_cast<uint8_t *>(VirtualAllocEx(processHandle, nullptr, 0x10000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READ));
+		if(!WriteProcessMemory(processHandle, targetCodeBase32, reinterpret_cast<LPCVOID>(stubData32), sizeof(stubData32), nullptr))
+			throw std::exception("WriteProcessMemory failed");
+		patch<TargetData32>(processHandle, &patchData32, targetCodeBase32);
+	}
 #else
 	if(!WriteProcessMemory(processHandle, targetCodeBase, reinterpret_cast<LPCVOID>(stubData32), sizeof(stubData32), nullptr))
 		throw std::exception("WriteProcessMemory failed");
@@ -283,9 +426,21 @@ void Patcher::initPatch()
 	patchData.HookedNtConnectPort = HookedNtConnectPortAddr64;
 	patchData.HookedNtSecureConnectPort = HookedNtSecureConnectPortAddr64;
 	patchData.HookedNtRequestWaitReplyPort = HookedNtRequestWaitReplyPortAddr64;
+
+	patchData32.syscallSize = 15; //mov eax, <syscallno>; call dword ptr fs:[0xc0]; retn 0xnn;
+	patchData32.HookedNtCreateFile = HookedNtCreateFileAddr32;
+	patchData32.HookedNtReadFile = HookedNtReadFileAddr32;
+	patchData32.HookedNtWriteFile = HookedNtWriteFileAddr32;
+	patchData32.HookedNtDeviceIoControlFile = HookedNtDeviceIoControlFileAddr32;
+	patchData32.HookedNtQueryVolumeInformationFile = HookedNtQueryVolumeInformationFileAddr32;
+	patchData32.HookedNtCreateUserProcess = HookedNtCreateUserProcessAddr32;
+	patchData32.HookedNtDuplicateObject = HookedNtDuplicateObjectAddr32;
+	patchData32.HookedNtClose = HookedNtCloseAddr32;
+	patchData32.HookedNtConnectPort = HookedNtConnectPortAddr32;
+	patchData32.HookedNtSecureConnectPort = HookedNtSecureConnectPortAddr32;
+	patchData32.HookedNtRequestWaitReplyPort = HookedNtRequestWaitReplyPortAddr32;
 #else
-	patchData.syscallSize = 15; //mov eax, <syscallno>; call dword ptr fs:[0xc0]; retn 0xnn; (wow64)
-								//mov eax, <syscallno>; mov edx, 0x7ffe0300; call [edx]; retn 0xnn;
+	patchData.syscallSize = 15; //mov eax, <syscallno>; mov edx, 0x7ffe0300; call [edx]; retn 0xnn;
 	patchData.HookedNtCreateFile = HookedNtCreateFileAddr32;
 	patchData.HookedNtReadFile = HookedNtReadFileAddr32;
 	patchData.HookedNtWriteFile = HookedNtWriteFileAddr32;

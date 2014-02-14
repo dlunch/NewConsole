@@ -284,7 +284,7 @@ uint32_t __stdcall HookedNtDeviceIoControlFile(TargetData *targetData, void *Fil
 	if(IoStatusBlock && isFakeHandle(FileHandle))
 	{
 		HandleDeviceIoControlFileRequest request;
-		request.handle = FileHandle;
+		request.handle = reinterpret_cast<uint64_t>(FileHandle);
 		request.code = static_cast<uint32_t>(IoControlCode);
 		
 		sendPacketHeader(targetData, HandleDeviceIoControlFile, sizeof(request) + static_cast<uint32_t>(InputBufferLength));
@@ -336,7 +336,7 @@ uint32_t __stdcall HookedNtCreateUserProcess(TargetData *targetData, void **Proc
 		targetData->originalNtDuplicateObject(NtCurrentProcess(), *ProcessHandle, targetData->parentProcess, &resultHandle, 0, 0, DUPLICATE_SAME_ATTRIBUTES | DUPLICATE_SAME_ACCESS);
 		
 		HandleCreateUserProcessRequest request;
-		request.processHandle = resultHandle;
+		request.processHandle = reinterpret_cast<uint64_t>(resultHandle);
 		sendPacket(targetData, HandleCreateUserProcess, &request);
 		
 		PacketHeader header;
@@ -353,7 +353,7 @@ uint32_t __stdcall HookedNtDuplicateObject(TargetData *targetData, void *SourceP
 		HandleDuplicateObjectRequest request;
 		HandleDuplicateObjectResponse response;
 
-		request.handle = SourceHandle;
+		request.handle = reinterpret_cast<uint64_t>(SourceHandle);
 		sendPacket(targetData, HandleDuplicateObject, &request);
 
 		recvPacket(targetData, &response);
@@ -412,7 +412,7 @@ uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **Clie
 uint32_t __stdcall HookedNtRequestWaitReplyPort(TargetData *targetData, void *PortHandle, PLPC_MESSAGE Request, PLPC_MESSAGE IncomingReply)
 {
 	HandleLPCMessageRequest request;
-	request.requestPointer = Request;
+	request.requestPointer = reinterpret_cast<uint64_t>(Request);
 	sendPacketHeader(targetData, HandleLPCMessage, Request->Length + sizeof(request));
 	sendPacketData(targetData, &request, sizeof(request));
 	sendPacketData(targetData, Request, Request->Length);

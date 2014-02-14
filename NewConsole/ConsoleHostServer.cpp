@@ -123,7 +123,6 @@ ConsoleHost *ConsoleHostServer::findConsoleHostByPid(uint32_t pid)
 			}
 		}
 	}
-	consoleHostServerData_->waitingHosts.remove(foundHost);
 	return foundHost;
 }
 
