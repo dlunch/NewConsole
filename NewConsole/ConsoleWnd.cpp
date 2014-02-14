@@ -13,7 +13,7 @@ ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> ma
 	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1),
 	tsfDocumentMgr_(nullptr), tsfContext_(nullptr), tsfACPSink_(nullptr), 
 	selStart_(0), selEnd_(0), isSelectionInterim_(false), isSelectionEndsAtLeft_(false),
-	currentReadSize_(0)
+	currentReadSize_(0), endMask_(0)
 {
 	if(!tsfThreadMgr_)
 	{
@@ -188,6 +188,13 @@ bool ConsoleWnd::onKeyDown(int vk)
 		return false;
 	else if(vk == VK_DOWN)
 		return false;
+	else if(vk == VK_PRIOR) //page up
+	{
+		if(GetKeyState(VK_SHIFT) & 0x8000)
+		{
+
+		}
+	}
 
 	return false;
 }
@@ -221,31 +228,52 @@ void ConsoleWnd::checkPendingRead()
 {
 	if(!currentReadSize_)
 		return;
+	if(!inputBuffer_.size())
+		return;
 	if(!(host_->getInputMode() & ENABLE_LINE_INPUT))
 	{
 		size_t size = std::min(currentReadSize_, inputBuffer_.size());
 		host_->write(inputBuffer_.substr(0, size));
 		inputBuffer_.erase(0, size);
+		inputBufferUpdated();
 	}
 	else
 	{
-		size_t pos;
-		if((pos = inputBuffer_.find(L'\n')) != std::wstring::npos)
+		for(auto &it = inputBuffer_.begin(); it != inputBuffer_.end(); ++ it)
 		{
-			pos ++;
-			std::wstring buffer = inputBuffer_.substr(0, pos);
-			appendStringToBuffer(buffer);
-			buffer.replace(buffer.end() - 1, buffer.end(), L"\r\n");
-			host_->write(buffer);
-			inputBuffer_.erase(0, pos);
-			selStart_ = selEnd_ = 0;
+			if(*it < 0x20 && (1 << static_cast<uint8_t>(*it)) & endMask_)
+			{
+				size_t pos = it - inputBuffer_.begin() + 1;
+				std::wstring buffer = inputBuffer_.substr(0, pos);
+				if(*it == '\n')
+					appendStringToBuffer(buffer);
+				host_->write(buffer);
+				inputBuffer_.erase(0, pos);
+
+				selStart_ = selEnd_ = 0;
+				currentReadSize_ = 0;
+				inputBufferUpdated();
+				break;
+			}
 		}
 	}
 }
 
-void ConsoleWnd::handleRead(size_t size)
+void ConsoleWnd::handleRead(size_t size, uint32_t endMask, size_t nInitialBytes)
 {
 	currentReadSize_ = size;
+	endMask_ = endMask;
+	if(nInitialBytes)
+	{
+		std::lock_guard<std::mutex> guard(bufferLock_);
+		
+		auto lastLine = buffer_.rbegin();
+
+		inputBuffer_ = lastLine->first.substr(lastLine->first.size() - nInitialBytes);
+		lastLine->first.erase(lastLine->first.size() - nInitialBytes);
+		selStart_ = selEnd_ = inputBuffer_.size();
+		inputBufferUpdated();
+	}
 	checkPendingRead();
 }
 
@@ -262,13 +290,16 @@ bool ConsoleWnd::appendCharacter(const std::wstring &buffer)
 			return deleteOrBackspace(true);
 		else
 		{
+			std::wstring str = buffer;
+			if(buffer[0] == L'\n' && buffer.size() == 1)
+				str = L"\r\n";
 			if(selStart_ != selEnd_)
 			{
 				inputBuffer_.erase(selStart_, selStart_ - selEnd_ + 1);
 				selEnd_ = selStart_;
 			}
-			inputBuffer_.insert(selEnd_, buffer);
-			selEnd_ += buffer.size();
+			inputBuffer_.insert(selEnd_, str);
+			selEnd_ += str.size();
 			selStart_ = selEnd_;
 		}
 	}

@@ -170,7 +170,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 
 		queueReadOperation(request->sizeToRead, 
 						   std::bind(&ConsoleHostConnection::sendPacketWithData, connection, HandleReadFile, std::placeholders::_1, std::placeholders::_2), 
-						   false, nullptr);
+						   false, nullptr, ('\n' << 1), 0);
 	}
 	else if(op == HandleWriteFile)
 	{
@@ -251,6 +251,8 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 				NewReadConsoleInputControlData inputControl;
 				ReadProcessMemory(connection->getUserData(), reinterpret_cast<LPCVOID>(request->data2Ptr), &inputControl, sizeof(inputControl), nullptr);
 
+				inputControl.ctrlWakeupMask |= (1 << '\n');
+
 				struct ReadConsoleData
 				{
 					void *responsePtr;
@@ -270,11 +272,15 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 
 					delete readData;
 				}
-				, ((requestData.data && 0xff) == 1), userData);
+				, ((requestData.data && 0xff) == 1), userData, inputControl.ctrlWakeupMask, inputControl.nInitialBytes / 2);
 			}
 			else if(requestData.requestCode == 0x0200000a) //SetConsoleCursorPosition
 				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
 			else if(requestData.requestCode == 0x0200000d) //SetConsoleTextAttribute
+				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
+			else if(requestData.requestCode == 0x02000000) //FillConsoleOutput
+				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
+			else if(requestData.requestCode == 0x0300001f) //GetConsoleWindow
 				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
 			else
 				__nop();
@@ -367,7 +373,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 					sendCSRSSConsoleAPIResponse(readLambdaData->connection, messageHeader);
 
 					delete readLambdaData;
-				}, readData->isWideChar == 1, userData);
+				}, readData->isWideChar == 1, userData, ('\n' << 1), 0);
 			}
 			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
 			{
@@ -530,7 +536,7 @@ void ConsoleHost::write(const std::wstring &buffer)
 	queuedReadOperations_.pop();
 }
 
-void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completionHandler, bool isWideChar, void *userData)
+void ConsoleHost::queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completionHandler, bool isWideChar, void *userData, uint32_t endMask, size_t nInitialBytes)
 {
 	ConsoleReadOperation operation;
 	operation.size = size;
@@ -539,7 +545,7 @@ void ConsoleHost::queueReadOperation(size_t size, const std::function<void (cons
 	operation.userData = userData;
 	queuedReadOperations_.push(operation);
 
-	listener_->handleRead(size);
+	listener_->handleRead(size, endMask, nInitialBytes);
 }
 
 void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideChar)

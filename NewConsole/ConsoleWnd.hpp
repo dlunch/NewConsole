@@ -36,13 +36,14 @@ private:
 	bool isSelectionInterim_;
 	bool isSelectionEndsAtLeft_;
 	size_t currentReadSize_;
+	uint32_t endMask_;
 
 	std::wstring inputBuffer_;
 	std::list<std::pair<std::wstring, float>> buffer_;
 	std::mutex bufferLock_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
-	virtual void handleRead(size_t size);
+	virtual void handleRead(size_t size, uint32_t endMask, size_t nInitialBytes);
 	virtual void handleWrite(const std::wstring &buffer);
 
 	bool deleteOrBackspace(bool isBackspace);
