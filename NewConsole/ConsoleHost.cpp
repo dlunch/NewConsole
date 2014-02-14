@@ -118,364 +118,383 @@ void *ConsoleHost::getCSRSSCaptureBuffer(ConsoleHostConnection *connection, CSRS
 
 void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, uint32_t size, uint8_t *data)
 {
-	if(op == Initialize)
+	switch(op)
 	{
-		InitializeRequest *req = reinterpret_cast<InitializeRequest *>(data);
-		InitializeResponse response;
-
-		void *childProcessHandle = nullptr;
-		for(auto i : childProcesses_)
-			if(GetProcessId(i) == req->pid)
-				childProcessHandle = i;
-
-		connection->setUserData(childProcessHandle);
-
-		HANDLE resultHandle;
-		DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcessHandle, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
-		response.parentProcessHandle = reinterpret_cast<uint64_t>(resultHandle);
-
-		connection->sendPacket(Initialize, &response);
-	}
-	else if(op == HandleCreateFile)
-	{
-		HandleCreateFileRequest *request = reinterpret_cast<HandleCreateFileRequest *>(data);
-		HandleCreateFileResponse response;
-		response.returnFake = 1;
-		response.fakeHandle = reinterpret_cast<uint64_t>(newFakeHandle());
-
-		wchar_t fileName[255];
-		lstrcpyn(fileName, reinterpret_cast<LPCWSTR>(data + sizeof(HandleCreateFileRequest)), request->fileNameLen); //eabuffer follows.
-		fileName[request->fileNameLen / 2] = 0;
-
-		if(!wcsncmp(fileName, L"\\Input", 6) || !wcsncmp(fileName, L"\\??\\CONIN$", 10))
-			inputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
-		else if(!wcsncmp(fileName, L"\\Output", 7) || !wcsncmp(fileName, L"\\??\\CONOUT$", 11))
-			outputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
-		else if(!wcsncmp(fileName, L"\\Device\\ConDrv", 14) || !wcsncmp(fileName, L"\\Reference", 10))
-			serverHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
-		else if(!wcsncmp(fileName, L"\\Connect", 8))
+	case Initialize:
 		{
-			serverHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
-			void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
-			//TODO
+			InitializeRequest *req = reinterpret_cast<InitializeRequest *>(data);
+			InitializeResponse response;
+
+			void *childProcessHandle = nullptr;
+			for(auto i : childProcesses_)
+				if(GetProcessId(i) == req->pid)
+					childProcessHandle = i;
+
+			connection->setUserData(childProcessHandle);
+
+			HANDLE resultHandle;
+			DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcessHandle, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
+			response.parentProcessHandle = reinterpret_cast<uint64_t>(resultHandle);
+
+			connection->sendPacket(Initialize, &response);
 		}
-		else
-			response.returnFake = 0;
-
-		connection->sendPacket(HandleCreateFile, &response);
-	}
-	else if(op == HandleReadFile)
-	{
-		HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
-
-		queueReadOperation(request->sizeToRead, 
-						   std::bind(&ConsoleHostConnection::sendPacketWithData, connection, HandleReadFile, std::placeholders::_1, std::placeholders::_2), 
-						   false, nullptr, ('\n' << 1), 0);
-	}
-	else if(op == HandleWriteFile)
-	{
-		uint8_t *buf = reinterpret_cast<uint8_t *>(data);
-
-		handleWrite(buf, size, false);
-
-		HandleWriteFileResponse response;
-		response.writtenSize = size;
-
-		connection->sendPacket(HandleWriteFile, &response);
-	}
-	else if(op == HandleDeviceIoControlFile)
-	{
-		HandleDeviceIoControlFileRequest *request = reinterpret_cast<HandleDeviceIoControlFileRequest *>(data);
-		uint8_t *inputBuf = data + sizeof(HandleDeviceIoControlFileRequest);
-
-		if(request->code == 0x500037) //Win8.1: Called in ConsoleLaunchServerProcess
+		break;
+	case HandleCreateFile:
 		{
-			//inputBuf is RTL_USER_PROCESS_PARAMETERS, but we don't use that.
-			
-			//no output
-			connection->sendPacketHeader(HandleDeviceIoControlFile, 0);
-		}
-		else if(request->code == 0x500023) //Win8.1: Called in ConsoleCommitState
-		{
-			//kernelbase call SetInformationProcess(ProcessConsoleHostProcess) with result of this ioctl.
-			//set outputbuffer to console host process's pid.
-			size_t pid = GetCurrentProcessId();
-			connection->sendPacket(HandleDeviceIoControlFile, &pid);
-		}
-		else if(request->code = 0x500016) //Win8.1: Called in ConsoleCallServerGeneric
-		{
-			//no output
+			HandleCreateFileRequest *request = reinterpret_cast<HandleCreateFileRequest *>(data);
+			HandleCreateFileResponse response;
+			response.returnFake = 1;
+			response.fakeHandle = reinterpret_cast<uint64_t>(newFakeHandle());
 
-			NewConsoleCallServerRequestData requestData;
-			NewConsoleCallServerData *callData = reinterpret_cast<NewConsoleCallServerData *>(inputBuf);
-			NewConsoleCallServerGenericData *genericRequest = reinterpret_cast<NewConsoleCallServerGenericData *>(inputBuf + sizeof(NewConsoleCallServerData));
-			ReadProcessMemory(connection->getUserData(), reinterpret_cast<LPCVOID>(callData->requestDataPtr), &requestData, sizeof(NewConsoleCallServerRequestData), nullptr);
+			wchar_t fileName[255];
+			lstrcpyn(fileName, reinterpret_cast<LPCWSTR>(data + sizeof(HandleCreateFileRequest)), request->fileNameLen); //eabuffer follows.
+			fileName[request->fileNameLen / 2] = 0;
 
-			if(requestData.requestCode == 0x1000008) //SetTEBLangID
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
-			else if(requestData.requestCode == 0x1000000) //GetConsoleCP
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, CP_UTF8);
-			else if(requestData.requestCode == 0x1000002) //SetConsoleMode
+			if(!wcsncmp(fileName, L"\\Input", 6) || !wcsncmp(fileName, L"\\??\\CONIN$", 10))
+				inputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
+			else if(!wcsncmp(fileName, L"\\Output", 7) || !wcsncmp(fileName, L"\\??\\CONOUT$", 11))
+				outputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
+			else if(!wcsncmp(fileName, L"\\Device\\ConDrv", 14) || !wcsncmp(fileName, L"\\Reference", 10))
+				serverHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
+			else if(!wcsncmp(fileName, L"\\Connect", 8))
 			{
-				setConsoleMode(callData->requestHandle, requestData.data);
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
+				serverHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
+				void *EaBuffer = data + sizeof(HandleCreateFileRequest) + request->fileNameLen;
+				//TODO
 			}
-			else if(requestData.requestCode == 0x1000001) //GetConsoleMode
-			{
-				uint32_t result = getConsoleMode(callData->requestHandle);
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, result);
-			}
-			else if(requestData.requestCode == 0x2000014) //GetConsoleTitle
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
-			else if(requestData.requestCode == 0x2000007) //GetConsoleScreenBufferInfoEx
-			{
-				GetConsoleScreenBufferInfoExResponse response;
-				getConsoleScreenBufferInfo(&response);
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, &response, sizeof(response));
-			}
-			else if(requestData.requestCode == 0x1000006) //WriteConsole
-			{
-				NewWriteConsoleRequestData *request = reinterpret_cast<NewWriteConsoleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
-				uint8_t *writeData = new uint8_t[request->dataSize];
-				ReadProcessMemory(connection->getUserData(), reinterpret_cast<LPCVOID>(request->dataPtr), writeData, request->dataSize, nullptr);
-
-				handleWrite(writeData, request->dataSize, (requestData.data1 == 1));
-
-				delete [] writeData;
-
-				sendNewConsoleAPIResponse(connection, request->responsePtr, request->dataSize);
-			}
-			else if(requestData.requestCode == 0x1000005) //ReadConsole
-			{
-				NewReadConsoleRequestData *request = reinterpret_cast<NewReadConsoleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
-				NewReadConsoleInputControlData inputControl;
-				ReadProcessMemory(connection->getUserData(), reinterpret_cast<LPCVOID>(request->data2Ptr), &inputControl, sizeof(inputControl), nullptr);
-
-				inputControl.ctrlWakeupMask |= (1 << '\n');
-
-				struct ReadConsoleData
-				{
-					void *responsePtr;
-					void *dataPtr;
-					ConsoleHostConnection *connection;
-				};
-				ReadConsoleData *userData = new ReadConsoleData;
-				userData->responsePtr = request->data2Ptr;
-				userData->dataPtr = request->dataPtr;
-				userData->connection = connection;
-
-				queueReadOperation(request->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
-					ReadConsoleData *readData = reinterpret_cast<ReadConsoleData *>(userData);
-
-					WriteProcessMemory(readData->connection->getUserData(), readData->dataPtr, buffer, bufferSize, nullptr);
-					sendNewConsoleAPIResponse(readData->connection, readData->responsePtr, static_cast<uint32_t>(nChar));
-
-					delete readData;
-				}
-				, ((requestData.data && 0xff) == 1), userData, inputControl.ctrlWakeupMask, inputControl.nInitialBytes / 2);
-			}
-			else if(requestData.requestCode == 0x0200000a) //SetConsoleCursorPosition
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
-			else if(requestData.requestCode == 0x0200000d) //SetConsoleTextAttribute
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
-			else if(requestData.requestCode == 0x02000000) //FillConsoleOutput
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
-			else if(requestData.requestCode == 0x0300001f) //GetConsoleWindow
-				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
 			else
-				__nop();
-		}
-		else
-			__debugbreak();
-	}
-	else if(op == HandleCreateUserProcess)
-	{
-		HandleCreateUserProcessRequest *request = reinterpret_cast<HandleCreateUserProcessRequest *>(data);
+				response.returnFake = 0;
 
-		if(ConsoleHostServer::patchProcess(reinterpret_cast<void *>(request->processHandle)))
-		{
-			childProcesses_.push_back(reinterpret_cast<void *>(request->processHandle));
-			ConsoleHostServer::registerConsoleHost(this);
+			connection->sendPacket(HandleCreateFile, &response);
 		}
+		break;
+	case HandleReadFile:
+		{
+			HandleReadFileRequest *request = reinterpret_cast<HandleReadFileRequest *>(data);
+
+			queueReadOperation(request->sizeToRead,
+							   std::bind(&ConsoleHostConnection::sendPacketWithData, connection, HandleReadFile, std::placeholders::_1, std::placeholders::_2),
+							   false, nullptr, ('\n' << 1), 0);
+		}
+		break;
+	case HandleWriteFile:
+		{
+			uint8_t *buf = reinterpret_cast<uint8_t *>(data);
+
+			handleWrite(buf, size, false);
+
+			HandleWriteFileResponse response;
+			response.writtenSize = size;
+
+			connection->sendPacket(HandleWriteFile, &response);
+		}
+		break;
+	case HandleDeviceIoControlFile:
+		{
+			HandleDeviceIoControlFileRequest *request = reinterpret_cast<HandleDeviceIoControlFileRequest *>(data);
+			uint8_t *inputBuf = data + sizeof(HandleDeviceIoControlFileRequest);
+
+			switch(request->code)
+			{
+			case 0x500037: //Win8.1: Called in ConsoleLaunchServerProcess
+				{
+					//inputBuf is RTL_USER_PROCESS_PARAMETERS, but we don't use that.
+			
+					//no output
+					connection->sendPacketHeader(HandleDeviceIoControlFile, 0);
+				}
+				break;
+			case 0x500023: //Win8.1: Called in ConsoleCommitState
+				{
+					//kernelbase call SetInformationProcess(ProcessConsoleHostProcess) with result of this ioctl.
+					//set outputbuffer to console host process's pid.
+					size_t pid = GetCurrentProcessId();
+					connection->sendPacket(HandleDeviceIoControlFile, &pid);
+				}
+				break;
+			case 0x500016: //Win8.1: Called in ConsoleCallServerGeneric
+				{
+					//no output
+					NewConsoleCallServerRequestData requestData;
+					NewConsoleCallServerData *callData = reinterpret_cast<NewConsoleCallServerData *>(inputBuf);
+					NewConsoleCallServerGenericData *genericRequest = reinterpret_cast<NewConsoleCallServerGenericData *>(inputBuf + sizeof(NewConsoleCallServerData));
+					ReadProcessMemory(connection->getUserData(), reinterpret_cast<LPCVOID>(callData->requestDataPtr), &requestData, sizeof(NewConsoleCallServerRequestData), nullptr);
+
+					switch(requestData.requestCode)
+					{
+					case 0x1000000: //GetConsoleCP
+						sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, CP_UTF8);
+						break;
+					case 0x1000001: //GetConsoleMode
+						{
+							uint32_t result = getConsoleMode(callData->requestHandle);
+							sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, result);
+						}
+						break;
+					case 0x2000007: //GetConsoleScreenBufferInfoEx
+						{
+							GetConsoleScreenBufferInfoExResponse response;
+							getConsoleScreenBufferInfo(&response);
+							sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, &response, sizeof(response));
+						}
+						break;
+					case 0x1000006: //WriteConsole
+						{
+							NewWriteConsoleRequestData *request = reinterpret_cast<NewWriteConsoleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
+							uint8_t *writeData = new uint8_t[request->dataSize];
+							ReadProcessMemory(connection->getUserData(), reinterpret_cast<LPCVOID>(request->dataPtr), writeData, request->dataSize, nullptr);
+
+							handleWrite(writeData, request->dataSize, (requestData.data1 == 1));
+
+							delete [] writeData;
+
+							sendNewConsoleAPIResponse(connection, request->responsePtr, request->dataSize);
+						}
+						break;
+					case 0x1000005: //ReadConsole
+						{
+							NewReadConsoleRequestData *request = reinterpret_cast<NewReadConsoleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
+							NewReadConsoleInputControlData inputControl;
+							ReadProcessMemory(connection->getUserData(), reinterpret_cast<LPCVOID>(request->data2Ptr), &inputControl, sizeof(inputControl), nullptr);
+
+							inputControl.ctrlWakeupMask |= (1 << '\n');
+
+							struct ReadConsoleData
+							{
+								void *responsePtr;
+								void *dataPtr;
+								ConsoleHostConnection *connection;
+							};
+							ReadConsoleData *userData = new ReadConsoleData;
+							userData->responsePtr = request->data2Ptr;
+							userData->dataPtr = request->dataPtr;
+							userData->connection = connection;
+
+							queueReadOperation(request->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
+								ReadConsoleData *readData = reinterpret_cast<ReadConsoleData *>(userData);
+
+								WriteProcessMemory(readData->connection->getUserData(), readData->dataPtr, buffer, bufferSize, nullptr);
+								sendNewConsoleAPIResponse(readData->connection, readData->responsePtr, static_cast<uint32_t>(nChar));
+
+								delete readData;
+							}
+							, ((requestData.data && 0xff) == 1), userData, inputControl.ctrlWakeupMask, inputControl.nInitialBytes / 2);
+						}
+						break;
+
+					case 0x1000002: //SetConsoleMode
+						setConsoleMode(callData->requestHandle, requestData.data);
+					case 0x2000014: //GetConsoleTitle
+					case 0x1000008: //SetTEBLangID
+					case 0x200000a: //SetConsoleCursorPosition
+					case 0x200000d: //SetConsoleTextAttribute
+					case 0x2000000: //FillConsoleOutput
+					case 0x300001f: //GetConsoleWindow
+						sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
+						break;
+					default:
+						__nop();
+					}
+				}
+				break;
+			default:
+				__debugbreak();
+			}
+		}
+		break;
+	case HandleCreateUserProcess:
+		{
+			HandleCreateUserProcessRequest *request = reinterpret_cast<HandleCreateUserProcessRequest *>(data);
+
+			if(ConsoleHostServer::patchProcess(reinterpret_cast<void *>(request->processHandle)))
+			{
+				childProcesses_.push_back(reinterpret_cast<void *>(request->processHandle));
+				ConsoleHostServer::registerConsoleHost(this);
+			}
 		
-		connection->sendPacketHeader(HandleCreateUserProcess, 0);
-	}
-	else if(op == HandleLPCMessage)
-	{
-		HandleLPCMessageRequest *request = reinterpret_cast<HandleLPCMessageRequest *>(data);
-
-		bool sent = false;
-		if(g_csrssAPITable)
+			connection->sendPacketHeader(HandleCreateUserProcess, 0);
+		}
+		break;
+	case HandleLPCMessage:
 		{
-			sent = true;
+			HandleLPCMessageRequest *request = reinterpret_cast<HandleLPCMessageRequest *>(data);
 
-			CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
-			uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest)+ sizeof(CSRSSLPCMessageHeader);
-			uint32_t apiNumber = messageHeader->ApiNumber & 0xffffffff;
-			if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiOpenConsole])	//kernel32 initialize always tries to openconsole first.
-			{																//calling original will fail(no existing console), so our console will work.
+			bool sent = false;
+			if(g_csrssAPITable)
+			{
+				sent = true;
+
+				CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
+				uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest)+ sizeof(CSRSSLPCMessageHeader);
+				uint32_t apiNumber = messageHeader->ApiNumber & 0xffffffff;
+				if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiOpenConsole])	//kernel32 initialize always tries to openconsole first.
+				{																//calling original will fail(no existing console), so our console will work.
+					HandleLPCMessageResponse response;
+					response.callOriginal = true;
+					connection->sendPacket(HandleLPCMessage, &response);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleMode])
+				{
+					CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
+					rdata->mode = getConsoleMode(rdata->handle);
+			
+					messageHeader->Status = 0;
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleMode])
+				{
+					CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
+					setConsoleMode(rdata->handle, rdata->mode);
+
+					messageHeader->Status = 0;
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiReadConsole])
+				{
+					struct CSRSSReadLambdaData
+					{
+						std::vector<uint8_t> messageBuf;
+						std::vector<uint8_t> captureBuffer;
+						void *requestPointer;
+						ConsoleHostConnection *connection;
+					};
+					CSRSSReadLambdaData *userData = new CSRSSReadLambdaData;
+					userData->messageBuf.assign(data, data + size);
+					userData->captureBuffer = readCSRSSCaptureData(connection, messageHeader);
+					userData->requestPointer = reinterpret_cast<void *>(request->requestPointer);
+					userData->connection = connection;
+
+					CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
+
+					queueReadOperation(readData->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
+						CSRSSReadLambdaData *readLambdaData = reinterpret_cast<CSRSSReadLambdaData *>(userData);
+						uint8_t *data = &readLambdaData->messageBuf[0];
+						CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
+						uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(CSRSSLPCMessageHeader);
+						CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
+
+						if(messageHeader->CsrCaptureData)
+						{
+							uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(readLambdaData->connection, messageHeader, 
+								readLambdaData->requestPointer, readLambdaData->captureBuffer, 0));
+							memcpy(data, buffer, bufferSize);
+							writeCSRSSCaptureData(readLambdaData->connection, messageHeader, readLambdaData->captureBuffer);
+						}
+						else
+							memcpy(readData->data, buffer, bufferSize);
+						readData->sizeRead = static_cast<uint32_t>(bufferSize);
+
+						messageHeader->Status = 0;
+						sendCSRSSConsoleAPIResponse(readLambdaData->connection, messageHeader);
+
+						delete readLambdaData;
+					}, readData->isWideChar == 1, userData, ('\n' << 1), 0);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
+				{
+					CSRSSWriteConsoleData *writeData = reinterpret_cast<CSRSSWriteConsoleData *>(dataPtr);
+					if(writeData->isEmbedded == 1)
+						handleWrite(writeData->data, writeData->dataSize, writeData->isWideChar == 1);
+					else
+					{
+						std::vector<uint8_t> buffer = readCSRSSCaptureData(connection, messageHeader);
+						uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(connection, messageHeader, reinterpret_cast<void *>(request->requestPointer), buffer, 0));
+						handleWrite(data, writeData->dataSize, writeData->isWideChar == 1);
+					}
+					messageHeader->Status = 0;
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleTitle])
+				{
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleScreenBufferInfo])
+				{
+					CSRSSGetConsoleScreenBufferInfoExResponse *data = reinterpret_cast<CSRSSGetConsoleScreenBufferInfoExResponse *>(dataPtr);
+					getConsoleScreenBufferInfo(&data->data);
+
+					messageHeader->Status = 0;
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleLangId])
+				{
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiVerifyConsoleIoHandle])
+				{
+					CSRSSVerifyConsoleIoHandleData *data = reinterpret_cast<CSRSSVerifyConsoleIoHandleData *>(dataPtr);
+
+					data->result = 1;
+					messageHeader->Status = 0;
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleCP])
+				{
+					CSRSSGetSetCPData *rdata = reinterpret_cast<CSRSSGetSetCPData *>(dataPtr);
+					rdata->codepage = CP_UTF8;
+					messageHeader->Status = 0;
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleTitle])
+				{
+					messageHeader->Status = 0;
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else if(apiNumber == 0x53) //only in windows 7. ConsoleClientConnect
+				{
+					std::vector<uint8_t> buffer = readCSRSSCaptureData(connection, messageHeader);
+
+					CSRSSConsoleClientConnectData *connectData = reinterpret_cast<CSRSSConsoleClientConnectData *>(
+						getCSRSSCaptureBuffer(connection, messageHeader, reinterpret_cast<void *>(request->requestPointer), buffer, 0));
+
+					connectData->consoleHandle = newFakeHandle();
+					connectData->inputHandle = newFakeHandle();
+					connectData->outputHandle = newFakeHandle();
+					connectData->errorHandle = newFakeHandle();
+
+					serverHandles_.push_back(connectData->consoleHandle);
+					inputHandles_.push_back(connectData->inputHandle);
+					outputHandles_.push_back(connectData->outputHandle);
+					outputHandles_.push_back(connectData->errorHandle);
+
+					messageHeader->Status = 0;
+					writeCSRSSCaptureData(connection, messageHeader, buffer);
+					sendCSRSSConsoleAPIResponse(connection, messageHeader);
+				}
+				else
+					sent = false;
+			}
+			if(sent == false)
+			{
 				HandleLPCMessageResponse response;
 				response.callOriginal = true;
 				connection->sendPacket(HandleLPCMessage, &response);
 			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleMode])
-			{
-				CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
-				rdata->mode = getConsoleMode(rdata->handle);
-			
-				messageHeader->Status = 0;
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleMode])
-			{
-				CSRSSGetSetConsoleModeData *rdata = reinterpret_cast<CSRSSGetSetConsoleModeData *>(dataPtr);
-				setConsoleMode(rdata->handle, rdata->mode);
-
-				messageHeader->Status = 0;
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiReadConsole])
-			{
-				struct CSRSSReadLambdaData
-				{
-					std::vector<uint8_t> messageBuf;
-					std::vector<uint8_t> captureBuffer;
-					void *requestPointer;
-					ConsoleHostConnection *connection;
-				};
-				CSRSSReadLambdaData *userData = new CSRSSReadLambdaData;
-				userData->messageBuf.assign(data, data + size);
-				userData->captureBuffer = readCSRSSCaptureData(connection, messageHeader);
-				userData->requestPointer = reinterpret_cast<void *>(request->requestPointer);
-				userData->connection = connection;
-
-				CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
-
-				queueReadOperation(readData->sizeToRead, [this](const uint8_t *buffer, size_t bufferSize, size_t nChar, void *userData) {
-					CSRSSReadLambdaData *readLambdaData = reinterpret_cast<CSRSSReadLambdaData *>(userData);
-					uint8_t *data = &readLambdaData->messageBuf[0];
-					CSRSSLPCMessageHeader *messageHeader = reinterpret_cast<CSRSSLPCMessageHeader *>(data + sizeof(HandleLPCMessageRequest));
-					uint8_t *dataPtr = data + sizeof(HandleLPCMessageRequest) + sizeof(CSRSSLPCMessageHeader);
-					CSRSSReadConsoleData *readData = reinterpret_cast<CSRSSReadConsoleData *>(dataPtr);
-
-					if(messageHeader->CsrCaptureData)
-					{
-						uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(readLambdaData->connection, messageHeader, 
-							readLambdaData->requestPointer, readLambdaData->captureBuffer, 0));
-						memcpy(data, buffer, bufferSize);
-						writeCSRSSCaptureData(readLambdaData->connection, messageHeader, readLambdaData->captureBuffer);
-					}
-					else
-						memcpy(readData->data, buffer, bufferSize);
-					readData->sizeRead = static_cast<uint32_t>(bufferSize);
-
-					messageHeader->Status = 0;
-					sendCSRSSConsoleAPIResponse(readLambdaData->connection, messageHeader);
-
-					delete readLambdaData;
-				}, readData->isWideChar == 1, userData, ('\n' << 1), 0);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
-			{
-				CSRSSWriteConsoleData *writeData = reinterpret_cast<CSRSSWriteConsoleData *>(dataPtr);
-				if(writeData->isEmbedded == 1)
-					handleWrite(writeData->data, writeData->dataSize, writeData->isWideChar == 1);
-				else
-				{
-					std::vector<uint8_t> buffer = readCSRSSCaptureData(connection, messageHeader);
-					uint8_t *data = reinterpret_cast<uint8_t *>(getCSRSSCaptureBuffer(connection, messageHeader, reinterpret_cast<void *>(request->requestPointer), buffer, 0));
-					handleWrite(data, writeData->dataSize, writeData->isWideChar == 1);
-				}
-				messageHeader->Status = 0;
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleTitle])
-			{
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleScreenBufferInfo])
-			{
-				CSRSSGetConsoleScreenBufferInfoExResponse *data = reinterpret_cast<CSRSSGetConsoleScreenBufferInfoExResponse *>(dataPtr);
-				getConsoleScreenBufferInfo(&data->data);
-
-				messageHeader->Status = 0;
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleLangId])
-			{
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiVerifyConsoleIoHandle])
-			{
-				CSRSSVerifyConsoleIoHandleData *data = reinterpret_cast<CSRSSVerifyConsoleIoHandleData *>(dataPtr);
-
-				data->result = 1;
-				messageHeader->Status = 0;
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleCP])
-			{
-				CSRSSGetSetCPData *rdata = reinterpret_cast<CSRSSGetSetCPData *>(dataPtr);
-				rdata->codepage = CP_UTF8;
-				messageHeader->Status = 0;
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiSetConsoleTitle])
-			{
-				messageHeader->Status = 0;
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else if(apiNumber == 0x53) //only in windows 7. ConsoleClientConnect
-			{
-				std::vector<uint8_t> buffer = readCSRSSCaptureData(connection, messageHeader);
-
-				CSRSSConsoleClientConnectData *connectData = reinterpret_cast<CSRSSConsoleClientConnectData *>(
-					getCSRSSCaptureBuffer(connection, messageHeader, reinterpret_cast<void *>(request->requestPointer), buffer, 0));
-
-				connectData->consoleHandle = newFakeHandle();
-				connectData->inputHandle = newFakeHandle();
-				connectData->outputHandle = newFakeHandle();
-				connectData->errorHandle = newFakeHandle();
-
-				serverHandles_.push_back(connectData->consoleHandle);
-				inputHandles_.push_back(connectData->inputHandle);
-				outputHandles_.push_back(connectData->outputHandle);
-				outputHandles_.push_back(connectData->errorHandle);
-
-				messageHeader->Status = 0;
-				writeCSRSSCaptureData(connection, messageHeader, buffer);
-				sendCSRSSConsoleAPIResponse(connection, messageHeader);
-			}
-			else
-				sent = false;
 		}
-		if(sent == false)
+		break;
+	case HandleLPCConnect:
 		{
-			HandleLPCMessageResponse response;
-			response.callOriginal = true;
-			connection->sendPacket(HandleLPCMessage, &response);
+			LPCConnectRequest *request = reinterpret_cast<LPCConnectRequest *>(data);
+			csrssMemoryDiff_ = -static_cast<ssize_t>(request->serverBase) + static_cast<ssize_t>(request->clientBase);
+			connection->sendPacketHeader(HandleLPCConnect, 0);
 		}
-	}
-	else if(op == HandleLPCConnect)
-	{
-		LPCConnectRequest *request = reinterpret_cast<LPCConnectRequest *>(data);
-		csrssMemoryDiff_ = -static_cast<ssize_t>(request->serverBase) + static_cast<ssize_t>(request->clientBase);
-		connection->sendPacketHeader(HandleLPCConnect, 0);
-	}
-	else if(op == HandleDuplicateObject)
-	{
-		HandleDuplicateObjectRequest *request = reinterpret_cast<HandleDuplicateObjectRequest *>(data);
+		break;
+	case HandleDuplicateObject:
+		{
+			HandleDuplicateObjectRequest *request = reinterpret_cast<HandleDuplicateObjectRequest *>(data);
 
-		HandleDuplicateObjectResponse response;
-		response.fakeHandle = reinterpret_cast<uint64_t>(newFakeHandle());
+			HandleDuplicateObjectResponse response;
+			response.fakeHandle = reinterpret_cast<uint64_t>(newFakeHandle());
 
-		if(isOutputHandle(reinterpret_cast<void *>(request->handle)))
-			outputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
-		else if(isInputHandle(reinterpret_cast<void *>(request->handle)))
-			inputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
+			if(isOutputHandle(reinterpret_cast<void *>(request->handle)))
+				outputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
+			else if(isInputHandle(reinterpret_cast<void *>(request->handle)))
+				inputHandles_.push_back(reinterpret_cast<void *>(response.fakeHandle));
 
-		connection->sendPacket(HandleDuplicateObject, &response);
-	}
+			connection->sendPacket(HandleDuplicateObject, &response);
+		}
+		break;
+		}
 }
 
 void *ConsoleHost::newFakeHandle()
