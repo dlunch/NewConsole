@@ -48,10 +48,18 @@ struct NewReadConsoleRequestData
 	void *dataPtr2;
 	uint32_t unk5;
 	uint32_t unk6;
-	void *responsePtr;
+	void *data2Ptr;
 	uint32_t sizeToRead;
 	uint32_t unk7;
 	void *dataPtr;
+};
+
+struct NewReadConsoleInputControlData
+{
+	uint32_t response;
+	uint32_t nInitialBytes;
+	uint32_t ctrlWakeupMask;
+	uint32_t unk;
 };
 
 struct GetConsoleScreenBufferInfoExResponse

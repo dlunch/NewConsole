@@ -248,6 +248,8 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 			else if(requestData.requestCode == 0x1000005) //ReadConsole
 			{
 				NewReadConsoleRequestData *request = reinterpret_cast<NewReadConsoleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
+				NewReadConsoleInputControlData inputControl;
+				ReadProcessMemory(connection->getUserData(), reinterpret_cast<LPCVOID>(request->data2Ptr), &inputControl, sizeof(inputControl), nullptr);
 
 				struct ReadConsoleData
 				{
@@ -256,7 +258,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 					ConsoleHostConnection *connection;
 				};
 				ReadConsoleData *userData = new ReadConsoleData;
-				userData->responsePtr = request->responsePtr;
+				userData->responsePtr = request->data2Ptr;
 				userData->dataPtr = request->dataPtr;
 				userData->connection = connection;
 
@@ -545,7 +547,6 @@ void ConsoleHost::handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideCha
 	std::wstring stringBuf;
 	if(!isWideChar)
 	{
-		//input is unicode
 		int size = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize), nullptr, 0);
 		stringBuf.resize(size);
 		MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<LPSTR>(buffer), static_cast<int>(bufferSize), reinterpret_cast<LPTSTR>(&stringBuf[0]), size);
