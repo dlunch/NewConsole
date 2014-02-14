@@ -272,6 +272,8 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 			}
 			else if(requestData.requestCode == 0x0200000a) //SetConsoleCursorPosition
 				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
+			else if(requestData.requestCode == 0x0200000d) //SetConsoleTextAttribute
+				sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
 			else
 				__nop();
 		}
