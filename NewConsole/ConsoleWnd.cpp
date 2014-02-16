@@ -102,6 +102,7 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	Gdiplus::RectF screen(0.f, 0.f, static_cast<float>(width), static_cast<float>(height));
 	Gdiplus::StringFormat format(Gdiplus::StringFormatFlagsBypassGDI);
 	g.FillRectangle(&blackBrush, 0, 0, width, height);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
 
 	float currentHeight = 0;
 	decltype(buffer_)::reverse_iterator it, begin, end;
@@ -335,8 +336,8 @@ COORD ConsoleWnd::querySize(int cw, int ch)
 
 	ReleaseDC(nullptr, hdc);
 	
-	result.X = static_cast<int>(bound.Width);
-	result.Y = static_cast<int>(bound.Height * ch);
+	result.X = static_cast<int>(bound.Width + 1.f);
+	result.Y = static_cast<int>(bound.Height * ch + 1.f);
 
 	return result;
 }
