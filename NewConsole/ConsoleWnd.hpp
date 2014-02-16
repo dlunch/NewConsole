@@ -26,6 +26,7 @@ private:
 private:
 	std::shared_ptr<ConsoleHost> host_;
 
+	Gdiplus::Font font_;
 	std::shared_ptr<Gdiplus::Bitmap> cacheBitmap_;
 	int cacheScrollx_;
 	int cacheScrolly_;
@@ -54,13 +55,14 @@ private:
 	void inputBufferUpdated();
 	void appendStringToBuffer(const std::wstring &buffer);
 public:
-	ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd);
+	ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd, const std::wstring &fontFace, float fontSize);
 	~ConsoleWnd();
 
 	void drawScreenContents(HDC hdc, int x, int y, int width, int height, int scrollx, int scrolly);
 	bool appendCharacter(const std::wstring &buffer);
 	bool onKeyDown(int vk);
 	void activated();
+	COORD querySize(int cw, int ch);
 
 private:
 	//IUnknown methods.

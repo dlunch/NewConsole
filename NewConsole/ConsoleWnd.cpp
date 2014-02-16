@@ -9,8 +9,8 @@
 ITfThreadMgr *ConsoleWnd::tsfThreadMgr_;
 TfClientId ConsoleWnd::tsfClientId_;
 
-ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd) : 
-	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1),
+ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd, const std::wstring &fontFace, float fontSize) : 
+	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1), font_(fontFace.c_str(), fontSize),
 	tsfDocumentMgr_(nullptr), tsfContext_(nullptr), tsfACPSink_(nullptr), 
 	selStart_(0), selEnd_(0), isSelectionInterim_(false), isSelectionEndsAtLeft_(false),
 	currentReadSize_(0), endMask_(0)
@@ -97,7 +97,6 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	}
 
 	Gdiplus::Graphics g(cacheBitmap_.get());
-	Gdiplus::Font font(L"Consolas", 10);
 	Gdiplus::SolidBrush blackBrush(Gdiplus::Color::Black);
 	Gdiplus::SolidBrush whiteBrush(Gdiplus::Color::White);
 	Gdiplus::RectF screen(0.f, 0.f, static_cast<float>(width), static_cast<float>(height));
@@ -119,7 +118,7 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 				if(string.size() == 0) //empty line
 					string = L"\r\n";
 				Gdiplus::RectF bound;
-				g.MeasureString(string.c_str(), static_cast<int>(string.size()), &font, screen, &format, &bound);
+				g.MeasureString(string.c_str(), static_cast<int>(string.size()), &font_, screen, &format, &bound);
 				it->second = bound.Height;
 			}
 			currentHeight += it->second;
@@ -129,19 +128,19 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 		}
 		while(true)
 		{
+			if(it == begin)
+				break;
+
 			-- it;
 			if(it == begin && (host_->getInputMode() & ENABLE_ECHO_INPUT))
 			{
 				std::wstring tmp = it->first + inputBuffer_;
-				g.DrawString(tmp.c_str(), static_cast<int>(tmp.size()), &font, screen, &format, &whiteBrush);
+				g.DrawString(tmp.c_str(), static_cast<int>(tmp.size()), &font_, screen, &format, &whiteBrush);
 			}
 			else
-				g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font, screen, &format, &whiteBrush);
+				g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font_, screen, &format, &whiteBrush);
 			
 			screen.Y += it->second;
-
-			if(it == begin)
-				break;
 		}
 	}
 }
@@ -323,6 +322,24 @@ void ConsoleWnd::invalidateCache()
 	cacheScrollx_ = -1;
 }
 
+COORD ConsoleWnd::querySize(int cw, int ch)
+{
+	HDC hdc = GetDC(nullptr);
+	COORD result;
+	Gdiplus::RectF bound;
+	{
+		Gdiplus::Graphics g(hdc);
+		std::wstring temp(cw, L'T');
+		g.MeasureString(temp.c_str(), cw, &font_, Gdiplus::PointF(0.f, 0.f), &bound);
+	}
+
+	ReleaseDC(nullptr, hdc);
+	
+	result.X = static_cast<int>(bound.Width);
+	result.Y = static_cast<int>(bound.Height * ch);
+
+	return result;
+}
 
 //IUnknown
 ULONG STDMETHODCALLTYPE ConsoleWnd::AddRef()

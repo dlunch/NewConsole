@@ -42,9 +42,14 @@ int NewConsole::run(int nShowCmd)
 
 	ShowWindow(mainWnd_, nShowCmd);
 
-	consoles_.push_back(std::make_shared<ConsoleWnd>(L"C:\\windows\\system32\\cmd.exe", shared_from_this()));
+	consoles_.push_back(std::make_shared<ConsoleWnd>(L"C:\\windows\\system32\\cmd.exe", shared_from_this(), L"Consolas", 10.f));
 	activeConsole_ = *consoles_.begin();
 	activeConsole_.lock()->activated();
+
+	COORD size = activeConsole_.lock()->querySize(80, 24);
+	SetWindowPos(mainWnd_, nullptr, 0, 0, size.X, size.Y, SWP_NOMOVE | SWP_NOZORDER);
+
+	redraw();
 
 	MSG msg;
 	while(true)
