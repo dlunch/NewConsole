@@ -59,6 +59,7 @@ void ConsoleWnd::appendStringToBuffer(const std::wstring &buffer)
 		lastLine --;
 	std::wstring *line = &lastLine->first; //we need to modify last line.
 	size_t pos = line->size();
+	lastLine->second = 0.f;
 	for(size_t i = 0; i < buffer.size(); i ++)
 	{
 		if(buffer[i] == '\n')
