@@ -525,9 +525,11 @@ bool ConsoleHost::isOutputHandle(void *handle)
 	return false;
 }
 
-void ConsoleHost::handleDisconnected()
+void ConsoleHost::handleDisconnected(ConsoleHostConnection *connection)
 {
-
+	childProcesses_.remove(connection->getUserData());
+	if(childProcesses_.size() == 0)
+		listener_->handleFirstProcessEnd();
 }
 
 void ConsoleHost::write(const std::wstring &buffer)

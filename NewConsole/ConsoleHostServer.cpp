@@ -214,7 +214,7 @@ void ConsoleHostConnection::dataReceived(IOOperation *op, size_t receivedSize)
 void ConsoleHostConnection::disconnected(IOOperation *op)
 {
 	if(host_)
-		host_->handleDisconnected();
+		host_->handleDisconnected(this);
 	CloseHandle(pipe_);
 	pipe_ = INVALID_HANDLE_VALUE;
 }

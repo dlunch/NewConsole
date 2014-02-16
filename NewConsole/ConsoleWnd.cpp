@@ -10,7 +10,7 @@ ITfThreadMgr *ConsoleWnd::tsfThreadMgr_;
 TfClientId ConsoleWnd::tsfClientId_;
 
 ConsoleWnd::ConsoleWnd(const std::wstring &cmdline, std::weak_ptr<NewConsole> mainWnd, const std::wstring &fontFace, float fontSize) : 
-	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1), font_(fontFace.c_str(), fontSize),
+	cacheWidth_(-1), cacheHeight_(-1), mainWnd_(mainWnd), cacheScrollx_(-1), cacheScrolly_(-1), font_(fontFace.c_str(), fontSize), inputAllowed_(true),
 	tsfDocumentMgr_(nullptr), tsfContext_(nullptr), tsfACPSink_(nullptr), 
 	selStart_(0), selEnd_(0), isSelectionInterim_(false), isSelectionEndsAtLeft_(false),
 	currentReadSize_(0), endMask_(0)
@@ -134,7 +134,7 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 				break;
 
 			-- it;
-			if(it == begin && (host_->getInputMode() & ENABLE_ECHO_INPUT))
+			if(it == begin && (host_ && host_->getInputMode() & ENABLE_ECHO_INPUT))
 			{
 				std::wstring tmp = it->first + inputBuffer_;
 				g.DrawString(tmp.c_str(), static_cast<int>(tmp.size()), &font_, screen, &format, &whiteBrush);
@@ -260,6 +260,13 @@ void ConsoleWnd::checkPendingRead()
 	}
 }
 
+void ConsoleWnd::handleFirstProcessEnd()
+{
+	appendStringToBuffer(L"[Process terminated]");
+	inputAllowed_ = false;
+	host_.reset();
+}
+
 void ConsoleWnd::handleRead(size_t size, uint32_t endMask, size_t nInitialBytes)
 {
 	currentReadSize_ = size;
@@ -280,6 +287,8 @@ void ConsoleWnd::handleRead(size_t size, uint32_t endMask, size_t nInitialBytes)
 
 bool ConsoleWnd::appendCharacter(const std::wstring &buffer)
 {
+	if(!inputAllowed_)
+		return false;
 	if(buffer.size() == 0)
 		return false;
 

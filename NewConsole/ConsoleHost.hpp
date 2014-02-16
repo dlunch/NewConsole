@@ -72,7 +72,7 @@ public:
 	void startProcess(const std::wstring &cmdline);
 	void write(const std::wstring &buffer);
 	void handlePacket(ConsoleHostConnection *connection, uint16_t op, uint32_t size, uint8_t *data);
-	void handleDisconnected();
+	void handleDisconnected(ConsoleHostConnection *connection);
 
 	uint32_t getInputMode();
 };

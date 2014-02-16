@@ -39,6 +39,7 @@ private:
 	size_t currentReadSize_;
 	uint32_t endMask_;
 
+	bool inputAllowed_;
 	std::wstring inputBuffer_;
 	std::list<std::pair<std::wstring, float>> buffer_;
 	std::mutex bufferLock_;
@@ -46,6 +47,7 @@ private:
 private:
 	virtual void handleRead(size_t size, uint32_t endMask, size_t nInitialBytes);
 	virtual void handleWrite(const std::wstring &buffer);
+	virtual void handleFirstProcessEnd();
 
 	bool deleteOrBackspace(bool isBackspace);
 	void checkPendingRead();
