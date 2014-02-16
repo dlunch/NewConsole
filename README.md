@@ -14,6 +14,10 @@ Features
 - Alpha background support
 - Many bugs
 
+Screenshot
+----------
+![alt tag](https://raw.github.com/dlunch/NewConsole/master/Screenshot/sample.png)
+
 
 Requirements
 ------------
