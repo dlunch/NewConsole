@@ -150,6 +150,7 @@
     <ClCompile Include="Patcher.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Config.h" />
     <ClInclude Include="ConsoleEventListener.hpp" />
     <ClInclude Include="ConsoleHost.hpp" />
     <ClInclude Include="ConsoleHostServer.hpp" />

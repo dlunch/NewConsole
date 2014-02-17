@@ -3,6 +3,8 @@
 #include "ConsoleHost.hpp"
 #include "NewConsole.hpp"
 
+#include "Config.h"
+
 #undef min
 #undef max
 
@@ -100,9 +102,11 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	Gdiplus::Graphics g(cacheBitmap_.get());
 	Gdiplus::SolidBrush whiteBrush(Gdiplus::Color::White);
 	Gdiplus::RectF screen(0.f, 0.f, static_cast<float>(width), static_cast<float>(height));
-	Gdiplus::StringFormat format(Gdiplus::StringFormatFlagsBypassGDI);
-	g.Clear(Gdiplus::Color(0xc0, 0, 0, 0));
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
+	g.Clear(Gdiplus::Color(Config::getBackgroundColor()));
+	if(Config::useClearType())
+		g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
+	else
+		g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
 
 	float currentHeight = 0;
 	decltype(buffer_)::reverse_iterator it, begin, end;
@@ -119,7 +123,7 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 				if(string.size() == 0) //empty line
 					string = L"\r\n";
 				Gdiplus::RectF bound;
-				g.MeasureString(string.c_str(), static_cast<int>(string.size()), &font_, screen, &format, &bound);
+				g.MeasureString(string.c_str(), static_cast<int>(string.size()), &font_, screen, &bound);
 				it->second = static_cast<int>(bound.Height + 1.f);
 			}
 			currentHeight += it->second;
@@ -136,10 +140,10 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 			if(it == begin && (host_ && host_->getInputMode() & ENABLE_ECHO_INPUT))
 			{
 				std::wstring tmp = it->first + inputBuffer_;
-				g.DrawString(tmp.c_str(), static_cast<int>(tmp.size()), &font_, screen, &format, &whiteBrush);
+				g.DrawString(tmp.c_str(), static_cast<int>(tmp.size()), &font_, screen, nullptr, &whiteBrush);
 			}
 			else
-				g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font_, screen, &format, &whiteBrush);
+				g.DrawString(it->first.c_str(), static_cast<int>(it->first.size()), &font_, screen, nullptr, &whiteBrush);
 			
 			screen.Y += it->second;
 		}
