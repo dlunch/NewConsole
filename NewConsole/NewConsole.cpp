@@ -38,7 +38,7 @@ int NewConsole::run(int nShowCmd)
 	wcex.hCursor = LoadCursor(NULL, IDC_IBEAM);
 
 	mainWnd_ = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW | WS_EX_LAYERED, (LPCWSTR)RegisterClassEx(&wcex), TEXT("Console"), 
-							   WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, NULL, this);
+							  WS_POPUP, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, NULL, this);
 
 	ShowWindow(mainWnd_, nShowCmd);
 
@@ -137,6 +137,10 @@ LRESULT NewConsole::WndProc(UINT iMessage, WPARAM wParam, LPARAM lParam)
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
+	case WM_NCHITTEST:
+		if(GetKeyState(VK_MENU) & 0x8000)
+			return HTCAPTION;
+		return HTCLIENT;
 	case WM_SIZE:
 		if(mainBitmap_)
 			DeleteObject(mainBitmap_);

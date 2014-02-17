@@ -98,7 +98,7 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	}
 
 	Gdiplus::Graphics g(cacheBitmap_.get());
-	Gdiplus::SolidBrush blackBrush(Gdiplus::Color::Black);
+	Gdiplus::SolidBrush blackBrush(Gdiplus::Color(0x70, 0, 0, 0));
 	Gdiplus::SolidBrush whiteBrush(Gdiplus::Color::White);
 	Gdiplus::RectF screen(0.f, 0.f, static_cast<float>(width), static_cast<float>(height));
 	Gdiplus::StringFormat format(Gdiplus::StringFormatFlagsBypassGDI);
