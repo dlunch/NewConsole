@@ -53,19 +53,19 @@ void ConsoleWnd::appendStringToBuffer(const std::wstring &buffer)
 	if(buffer_.size() == 0)
 	{
 		std::lock_guard<std::mutex> guard(bufferLock_);
-		lastLine = buffer_.insert(buffer_.end(), std::make_pair(std::wstring(L""), 0.f));
+		lastLine = buffer_.insert(buffer_.end(), std::make_pair(std::wstring(L""), 0));
 	}
 	else
 		lastLine --;
 	std::wstring *line = &lastLine->first; //we need to modify last line.
 	size_t pos = line->size();
-	lastLine->second = 0.f;
+	lastLine->second = 0;
 	for(size_t i = 0; i < buffer.size(); i ++)
 	{
 		if(buffer[i] == '\n')
 		{
 			std::lock_guard<std::mutex> guard(bufferLock_);
-			auto it = buffer_.insert(buffer_.end(), std::make_pair(std::wstring(L""), 0.f));
+			auto it = buffer_.insert(buffer_.end(), std::make_pair(std::wstring(L""), 0));
 			line = &it->first;
 			pos = 0;
 		}
@@ -114,14 +114,14 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 		end = buffer_.rend();
 		for(it = begin; it != end; ++ it)
 		{
-			if(it->second == 0.f)
+			if(it->second == 0)
 			{
 				std::wstring string = it->first;
 				if(string.size() == 0) //empty line
 					string = L"\r\n";
 				Gdiplus::RectF bound;
 				g.MeasureString(string.c_str(), static_cast<int>(string.size()), &font_, screen, &format, &bound);
-				it->second = bound.Height;
+				it->second = static_cast<int>(bound.Height + 1.f);
 			}
 			currentHeight += it->second;
 

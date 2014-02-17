@@ -41,7 +41,7 @@ private:
 
 	bool inputAllowed_;
 	std::wstring inputBuffer_;
-	std::list<std::pair<std::wstring, float>> buffer_;
+	std::list<std::pair<std::wstring, size_t>> buffer_;
 	std::mutex bufferLock_;
 	std::weak_ptr<NewConsole> mainWnd_;
 private:
