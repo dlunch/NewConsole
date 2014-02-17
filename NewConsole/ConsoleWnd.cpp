@@ -98,11 +98,10 @@ void ConsoleWnd::updateCache(int width, int height, int scrollx, int scrolly)
 	}
 
 	Gdiplus::Graphics g(cacheBitmap_.get());
-	Gdiplus::SolidBrush blackBrush(Gdiplus::Color(0x70, 0, 0, 0));
 	Gdiplus::SolidBrush whiteBrush(Gdiplus::Color::White);
 	Gdiplus::RectF screen(0.f, 0.f, static_cast<float>(width), static_cast<float>(height));
 	Gdiplus::StringFormat format(Gdiplus::StringFormatFlagsBypassGDI);
-	g.FillRectangle(&blackBrush, 0, 0, width, height);
+	g.Clear(Gdiplus::Color(0xc0, 0, 0, 0));
 	g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
 
 	float currentHeight = 0;
@@ -158,6 +157,7 @@ void ConsoleWnd::drawScreenContents(HDC hdc, int x, int y, int width, int height
 		updateCache(width, height, scrollx, scrolly);
 
 	Gdiplus::Graphics g(hdc);
+	g.Clear(Gdiplus::Color(0, 0, 0, 0));
 	g.DrawImage(cacheBitmap_.get(), x, y);
 }
 
