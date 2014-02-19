@@ -550,7 +550,7 @@ void ConsoleHost::write(const std::wstring &buffer)
 		WideCharToMultiByte(CP_UTF8, 0, buffer.c_str(), -1, buf, len, 0, 0);
 		buf[len - 1] = 0;
 
-		i.completionHandler(reinterpret_cast<const uint8_t *>(buf), len, len - 1, i.userData);
+		i.completionHandler(reinterpret_cast<const uint8_t *>(buf), len - 1, len - 1, i.userData);
 		delete[] buf;
 	}
 	else
