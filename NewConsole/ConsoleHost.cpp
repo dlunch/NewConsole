@@ -174,7 +174,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 
 			queueReadOperation(request->sizeToRead,
 							   std::bind(&ConsoleHostConnection::sendPacketWithData, connection, HandleReadFile, std::placeholders::_1, std::placeholders::_2),
-							   false, nullptr, ('\n' << 1), 0);
+							   false, nullptr, (1 << '\n'), 0);
 		}
 		break;
 	case HandleWriteFile:
@@ -389,7 +389,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 						sendCSRSSConsoleAPIResponse(readLambdaData->connection, messageHeader);
 
 						delete readLambdaData;
-					}, readData->isWideChar == 1, userData, ('\n' << 1), 0);
+					}, readData->isWideChar == 1, userData, (1 << '\n'), 0);
 				}
 				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiWriteConsole])
 				{
