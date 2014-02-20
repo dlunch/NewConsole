@@ -292,8 +292,12 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 						break;
 					case 0x1000002: //SetConsoleMode
 						setConsoleMode(callData->requestHandle, requestData.data);
-					case 0x2000015: //SetConsoleTitle
+						sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
+						break;
 					case 0x1000008: //SetTEBLangID
+						sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, GetSystemDefaultLCID());
+						break;
+					case 0x2000015: //SetConsoleTitle
 					case 0x200000a: //SetConsoleCursorPosition
 					case 0x200000d: //SetConsoleTextAttribute
 					case 0x2000000: //FillConsoleOutput
