@@ -54,6 +54,16 @@ struct NewReadConsoleRequestData
 	void *dataPtr;
 };
 
+struct NewGetConsoleTitleRequestData
+{
+	uint32_t unk1;
+	uint32_t unk2;
+	void *responsePtr;
+	uint32_t dataSize;
+	uint32_t unk4;
+	void *dataPtr;
+};
+
 struct NewReadConsoleInputControlData
 {
 	uint32_t response;

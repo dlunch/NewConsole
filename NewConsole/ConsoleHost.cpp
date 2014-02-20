@@ -13,7 +13,7 @@
 const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0xb, 0x4c, 0x23, 0x3c, 0x25};
 const uint16_t *g_csrssAPITable;
 
-ConsoleHost::ConsoleHost(ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0)
+ConsoleHost::ConsoleHost(ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0), title_(L"Console")
 {	
 	if(!g_csrssAPITable)
 	{
@@ -281,10 +281,16 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 							, ((requestData.data && 0xff) == 1), userData, inputControl.ctrlWakeupMask, inputControl.nInitialBytes / 2);
 						}
 						break;
-
+					case 0x2000014: //GetConsoleTitle
+						{
+							NewGetConsoleTitleRequestData *request = reinterpret_cast<NewGetConsoleTitleRequestData *>(inputBuf + sizeof(NewConsoleCallServerData));
+							
+							WriteProcessMemory(connection->getUserData(), request->dataPtr, title_.c_str(), (title_.size() + 1) * 2, nullptr);
+							sendNewConsoleAPIResponse(connection, request->responsePtr, title_.size());
+						}
+						break;
 					case 0x1000002: //SetConsoleMode
 						setConsoleMode(callData->requestHandle, requestData.data);
-					case 0x2000014: //GetConsoleTitle
 					case 0x2000015: //SetConsoleTitle
 					case 0x1000008: //SetTEBLangID
 					case 0x200000a: //SetConsoleCursorPosition

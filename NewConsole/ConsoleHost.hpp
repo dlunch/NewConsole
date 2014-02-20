@@ -39,6 +39,7 @@ private:
 	std::list<void *> inputHandles_;
 	std::list<void *> outputHandles_;
 	std::list<void *> serverHandles_;
+	std::wstring title_;
 	ssize_t csrssMemoryDiff_;
 	std::queue<ConsoleReadOperation> queuedReadOperations_;
 
