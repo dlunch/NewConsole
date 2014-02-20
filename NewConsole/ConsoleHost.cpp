@@ -14,7 +14,7 @@ const uint16_t g_csrssAPITableWin7[] = {0, 0x8, 0x11, 0x1d, 0x1e, 0x24, 0xb, 0x4
 const uint16_t *g_csrssAPITable;
 
 ConsoleHost::ConsoleHost(ConsoleEventListener *listener) : listener_(listener), lastHandleId_(0), title_(L"Console")
-{	
+{
 	if(!g_csrssAPITable)
 	{
 #ifdef _WIN64
@@ -26,6 +26,7 @@ ConsoleHost::ConsoleHost(ConsoleEventListener *listener) : listener_(listener), 
 			g_csrssAPITable = g_csrssAPITableWin7;
 	}
 	setDefaultMode();
+	codePage_ = GetACP();
 	ConsoleHostServer::registerConsoleHost(this);
 }
 
@@ -223,7 +224,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 					switch(requestData.requestCode)
 					{
 					case 0x1000000: //GetConsoleCP
-						sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, CP_UTF8);
+						sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, codePage_);
 						break;
 					case 0x1000001: //GetConsoleMode
 						{
@@ -438,7 +439,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 				else if(apiNumber == g_csrssAPITable[CSRSSAPI::CSRSSApiGetConsoleCP])
 				{
 					CSRSSGetSetCPData *rdata = reinterpret_cast<CSRSSGetSetCPData *>(dataPtr);
-					rdata->codepage = CP_UTF8;
+					rdata->codepage = codePage_;
 					messageHeader->Status = 0;
 					sendCSRSSConsoleAPIResponse(connection, messageHeader);
 				}

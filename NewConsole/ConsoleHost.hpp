@@ -36,6 +36,7 @@ private:
 	std::list<void *> childProcesses_;
 	ConsoleEventListener *listener_;
 	int lastHandleId_;
+	int codePage_;
 	std::list<void *> inputHandles_;
 	std::list<void *> outputHandles_;
 	std::list<void *> serverHandles_;
