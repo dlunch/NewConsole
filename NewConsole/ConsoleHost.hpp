@@ -22,9 +22,8 @@ struct GetConsoleScreenBufferInfoExResponse;
 struct ConsoleReadOperation
 {
 	size_t size;
-	std::function<void (const uint8_t *, size_t, size_t, void *)> completionHandler;
+	std::function<void (const uint8_t *, size_t, size_t)> completionHandler;
 	bool isWideChar;
-	void *userData;
 };
 
 class ConsoleHost
@@ -48,7 +47,7 @@ private:
 	void setDefaultMode();
 	void *newFakeHandle();
 	void cleanup();
-	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t, void *)> &completionHandler, bool isWideChar, void *userData, uint32_t endMask, size_t nInitialBytes);
+	void queueReadOperation(size_t size, const std::function<void (const uint8_t *, size_t, size_t)> &completionHandler, bool isWideChar, uint32_t endMask, size_t nInitialBytes);
 	void checkQueuedRead(const std::wstring &buffer);
 	void handleWrite(uint8_t *buffer, size_t bufferSize, bool isWideChar);
 	bool isInputHandle(void *handle);
