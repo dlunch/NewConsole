@@ -44,8 +44,14 @@ struct TargetData
 	NtRequestWaitReplyPort originalNtRequestWaitReplyPort;
 
 	bool initialized;
-	void *pipeHandle;
 	void *parentProcess;
+
+	struct ThreadData
+	{
+		uint32_t tid;
+		void *pipe;
+	};
+	ThreadData threadData[1];
 };
 
 extern "C" {
@@ -128,6 +134,8 @@ void *openPipe(TargetData *targetData)
 	return handle;
 }
 
+void *getPipeHandle(TargetData *targetData);
+
 bool isFakeHandle(void *handle)
 {
 	return (reinterpret_cast<size_t>(handle) & 0xffff0000) == 0x6eff0000;
@@ -135,8 +143,9 @@ bool isFakeHandle(void *handle)
 
 void sendPacketData(TargetData *targetData, void *data, size_t size)
 {
+	void *pipe = getPipeHandle(targetData);
 	IO_STATUS_BLOCK statusBlock;
-	targetData->originalNtWriteFile(targetData->pipeHandle, 0, 0, 0, &statusBlock, data, size, 0, 0);
+	targetData->originalNtWriteFile(pipe, 0, 0, 0, &statusBlock, data, size, 0, 0);
 }
 
 void sendPacketHeader(TargetData *targetData, uint16_t op, uint32_t length)
@@ -164,8 +173,9 @@ void sendPacket(TargetData *targetData, uint16_t op, T *data)
 
 void recvPacketData(TargetData *targetData, void *data, size_t size)
 {
+	void *pipe = getPipeHandle(targetData);
 	IO_STATUS_BLOCK statusBlock;
-	targetData->originalNtReadFile(targetData->pipeHandle, 0, 0, 0, &statusBlock, data, size, 0, 0);
+	targetData->originalNtReadFile(pipe, 0, 0, 0, &statusBlock, data, size, 0, 0);
 }
 
 void recvPacketHeader(TargetData *targetData, PacketHeader *header)
@@ -188,26 +198,65 @@ uint32_t recvPacket(TargetData *targetData, T *data, size_t *length = nullptr)
 	return header.op;
 }
 
-void initialize(TargetData *targetData)
+uint64_t sendInitialize(TargetData *targetData)
 {
-	//send pid
 #ifdef _WIN64
 	TEB *teb = reinterpret_cast<TEB *>(__readgsqword(0x30));
-	PEB64 *peb = reinterpret_cast<PEB64 *>(__readgsqword(0x60));
 #elif defined(_WIN32)
 	TEB *teb = reinterpret_cast<TEB *>(__readfsdword(0x18));
-	PEB32 *peb = reinterpret_cast<PEB32 *>(__readfsdword(0x30));
 #endif
+
 	InitializeRequest packet;
 	packet.pid = reinterpret_cast<uint32_t>(teb->ClientId.UniqueProcess);
+	packet.firstRequest = !targetData->initialized;
 
-	targetData->pipeHandle = openPipe(targetData);
 	sendPacket(targetData, Initialize, &packet);
 
 	InitializeResponse response;
 	recvPacket(targetData, &response);
 
-	targetData->parentProcess = reinterpret_cast<void *>(response.parentProcessHandle);
+	return response.parentProcessHandle;
+}
+
+void *getPipeHandle(TargetData *targetData)
+{
+#ifdef _WIN64
+	TEB *teb = reinterpret_cast<TEB *>(__readgsqword(0x30));
+#elif defined(_WIN32)
+	TEB *teb = reinterpret_cast<TEB *>(__readfsdword(0x18));
+#endif
+	uint32_t tid = reinterpret_cast<uint32_t>(teb->ClientId.UniqueThread);
+	TargetData::ThreadData *threadData = targetData->threadData;
+	while(threadData->tid != 0)
+	{
+		if(threadData->tid == tid)
+			break;
+		threadData ++;
+	}
+
+	if(threadData->tid != tid)
+	{
+		threadData->tid = tid;
+		threadData->pipe = openPipe(targetData);
+		sendInitialize(targetData);
+	}
+	return threadData->pipe;
+}
+
+void initialize(TargetData *targetData)
+{
+	//send pid
+#ifdef _WIN64
+	TEB *teb = reinterpret_cast<TEB *>(__readgsqword(0x30));
+#elif defined(_WIN32)
+	TEB *teb = reinterpret_cast<TEB *>(__readfsdword(0x18));
+#endif
+	uint32_t tid = reinterpret_cast<uint32_t>(teb->ClientId.UniqueThread);
+	targetData->threadData[0].tid = tid;
+	targetData->threadData[0].pipe = openPipe(targetData);
+	uint64_t parentProcess = sendInitialize(targetData);
+
+	targetData->parentProcess = reinterpret_cast<void *>(parentProcess);
 	targetData->initialized = true;
 }
 

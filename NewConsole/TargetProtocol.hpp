@@ -25,6 +25,7 @@ enum PacketOp
 struct InitializeRequest
 {
 	uint32_t pid;
+	uint32_t firstRequest;
 };
 
 struct InitializeResponse

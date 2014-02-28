@@ -133,9 +133,12 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 
 			connection->setUserData(childProcessHandle);
 
-			HANDLE resultHandle;
-			DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcessHandle, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
-			response.parentProcessHandle = reinterpret_cast<uint64_t>(resultHandle);
+			if(req->firstRequest)
+			{
+				HANDLE resultHandle;
+				DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), childProcessHandle, &resultHandle, 0, TRUE, DUPLICATE_SAME_ACCESS);
+				response.parentProcessHandle = reinterpret_cast<uint64_t>(resultHandle);
+			}
 
 			connection->sendPacket(Initialize, &response);
 		}
