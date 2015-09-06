@@ -5,6 +5,8 @@
 
 #include "Config.h"
 
+#include <iterator>
+
 #undef min
 #undef max
 
