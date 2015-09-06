@@ -294,6 +294,7 @@ void ConsoleHost::handlePacket(ConsoleHostConnection *connection, uint16_t op, u
 					case 0x200000d: //SetConsoleTextAttribute
 					case 0x2000000: //FillConsoleOutput
 					case 0x300001f: //GetConsoleWindow
+					case 0x3000004: //?? Called by powershell
 						sendNewConsoleAPIResponse(connection, genericRequest->responsePtr, 0);
 						break;
 					default:
