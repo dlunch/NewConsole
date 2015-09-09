@@ -441,11 +441,18 @@ uint32_t __stdcall HookedNtConnectPort(TargetData *targetData, void **ClientPort
 	if(!targetData->initialized)
 		initialize(targetData);
 
-	uint32_t ret = targetData->originalNtConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, ServerSharedMemory, MaximumMessageLength, 
-													 ConnectionInfo, ConnectionInfoLength);
-	if(ClientSharedMemory)
+	//\\RPC Control\\console-0x%p-lpc-handle or \\RPC Control\\ConsoleLPC-0x%p-%ws
+	if(ServerPortName && ServerPortName->Buffer && ServerPortName->Buffer[1] == L'R' && ServerPortName->Buffer[14] == L'o' && ServerPortName->Buffer[15] == L'n' && ClientSharedMemory)
+	{
+		ServerSharedMemory->Length = ClientSharedMemory->Length;
+		ServerSharedMemory->ViewBase = ClientSharedMemory->ViewBase;
+		ServerSharedMemory->ViewSize = ClientSharedMemory->ViewSize;
+		*reinterpret_cast<uint32_t *>(ClientPortHandle) = 1;
 		onConnectPort(targetData, ClientSharedMemory->OtherSideViewBase, ClientSharedMemory->ViewBase);
-	return ret;
+		return 0;
+	}
+	return targetData->originalNtConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, ServerSharedMemory, MaximumMessageLength, 
+													 ConnectionInfo, ConnectionInfoLength);
 }
 
 uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **ClientPortHandle, PUNICODE_STRING ServerPortName, size_t SecurityQos,
@@ -455,10 +462,18 @@ uint32_t __stdcall HookedNtSecureConnectPort(TargetData *targetData, void **Clie
 	if(!targetData->initialized)
 		initialize(targetData);
 
-	uint32_t ret = targetData->originalNtSecureConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, Sid, ServerSharedMemory, 
+	//\\RPC Control\\console-0x%p-lpc-handle or \\RPC Control\\ConsoleLPC-0x%p-%ws
+	if(ServerPortName && ServerPortName->Buffer && ServerPortName->Buffer[1] == L'R' && ServerPortName->Buffer[14] == L'o' && ServerPortName->Buffer[15] == L'n' && ClientSharedMemory)
+	{
+		ServerSharedMemory->Length = ClientSharedMemory->Length;
+		ServerSharedMemory->ViewBase = ClientSharedMemory->ViewBase;
+		ServerSharedMemory->ViewSize = ClientSharedMemory->ViewSize;
+		*reinterpret_cast<uint32_t *>(ClientPortHandle) = 1;
+		onConnectPort(targetData, ClientSharedMemory->OtherSideViewBase, ClientSharedMemory->ViewBase);
+		return 0;
+	}
+	return targetData->originalNtSecureConnectPort(ClientPortHandle, ServerPortName, SecurityQos, ClientSharedMemory, Sid, ServerSharedMemory, 
 														   MaximumMessageLength, ConnectionInfo, ConnectionInfoLength);
-	onConnectPort(targetData, ClientSharedMemory->OtherSideViewBase, ClientSharedMemory->ViewBase);
-	return ret;
 }
 
 uint32_t __stdcall HookedNtRequestWaitReplyPort(TargetData *targetData, void *PortHandle, PLPC_MESSAGE Request, PLPC_MESSAGE IncomingReply)
