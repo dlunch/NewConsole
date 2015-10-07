@@ -6,6 +6,11 @@ What's this?
 
 Simple console replacement for Windows.
 
+Note
+----
+
+You have to run this program in native bitness (x64 build on x64 windows, ..)
+
 Features
 --------
 
