@@ -1,3 +1,5 @@
+# ABANDONED
+
 NewConsole
 ==========
 
@@ -27,4 +29,4 @@ Screenshot
 Requirements
 ------------
 
-Windows 7 or later. (x64 and x86 are both supported)
+Windows 7, 8, 8.1. (x64 and x86 are both supported)
